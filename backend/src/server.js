@@ -10,6 +10,8 @@ const menuRoutes = require("./routes/menu.routes");
 const ordersRoutes = require("./routes/orders.routes");
 const adminRoutes = require("./routes/admin.routes");
 const settingsRoutes = require("./routes/settings.routes");
+const catalogRoutes = require("./routes/catalog.routes");
+const customersRoutes = require("./routes/customers.routes");
 
 const authRoutes = require("./routes/auth.routes");
 const authMiddleware = require("./middlewares/auth.middleware");
@@ -34,6 +36,7 @@ app.use("/api", ordersRoutes);
 
 app.use("/api", authRoutes);
 
+
 // rota pública de validação da mesa
 app.get(
   "/api/public/table/:number/:token",
@@ -43,6 +46,8 @@ app.get(
 // admin protegido
 app.use("/api", authMiddleware, adminRoutes);
 app.use("/api", authMiddleware, settingsRoutes);
+app.use("/api", authMiddleware, customersRoutes);
+app.use("/api", authMiddleware, catalogRoutes);
 
 app.get("/", (req, res) => {
   res.json({

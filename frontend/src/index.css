@@ -8,11 +8,47 @@
 
 body {
   margin: 0;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #f3f6fb;
+  color: #0f172a;
 }
 
 button,
 input,
-textarea {
+textarea,
+select {
   font-family: inherit;
+}
+
+.font-black {
+  font-weight: 700 !important;
+}
+
+.font-bold {
+  font-weight: 600 !important;
+}
+
+.admin-card {
+  @apply bg-white border border-slate-200 rounded-3xl shadow-sm;
+}
+
+.admin-input {
+  @apply w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition;
+}
+
+.admin-btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold transition;
+}
+
+.admin-btn-dark {
+  @apply bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-semibold transition;
+}
+
+.admin-btn-danger {
+  @apply bg-red-600 hover:bg-red-700 text-white rounded-2xl font-semibold transition;
+}
+
+.admin-btn-muted {
+  @apply bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-semibold transition;
 }
