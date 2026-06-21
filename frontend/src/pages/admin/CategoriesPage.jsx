@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import api from "../../api/axios";
+import PremiumPagination from "../../components/PremiumPagination";
 
 const emptyForm = {
   name: "",
@@ -23,6 +24,8 @@ export default function CategoriesPage() {
   const [editing, setEditing] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+const itemsPerPage = 10;
 
   async function loadCategories() {
     const { data } = await api.get("/admin/categories");
@@ -44,6 +47,11 @@ export default function CategoriesPage() {
       );
     });
   }, [categories, search]);
+
+  const paginatedCategories = filteredCategories.slice(
+  (page - 1) * itemsPerPage,
+  page * itemsPerPage
+);
 
   function openCreate() {
     setEditing(null);
@@ -106,6 +114,10 @@ export default function CategoriesPage() {
     }
   }
 
+  useEffect(() => {
+  setPage(1);
+}, [search]);
+
   return (
     <AdminLayout
       title="Categorias"
@@ -157,7 +169,7 @@ export default function CategoriesPage() {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {filteredCategories.map((category) => (
+              {paginatedCategories.map((category) => (
                 <tr key={category.id} className="hover:bg-slate-50/70 transition">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-4">
@@ -230,6 +242,12 @@ export default function CategoriesPage() {
               )}
             </tbody>
           </table>
+          <PremiumPagination
+  totalItems={filteredCategories.length}
+  itemsPerPage={itemsPerPage}
+  currentPage={page}
+  onPageChange={setPage}
+/>
         </div>
       </section>
 

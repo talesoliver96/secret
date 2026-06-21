@@ -1,42 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../api/axios";
+import logo from "../../assets/logo.png";
 
 export default function MenuPage() {
   const { numero, token } = useParams();
 
-  const [tableValid, setTableValid] = useState(false);
-  const [tableError, setTableError] = useState("");
-
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("todos");
   const [cart, setCart] = useState([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [customer, setCustomer] = useState({ name: "", phone: "" });
   const [notes, setNotes] = useState("");
+  const [tableValid, setTableValid] = useState(false);
+  const [tableError, setTableError] = useState("");
   const [loading, setLoading] = useState(false);
   const [successOrder, setSuccessOrder] = useState(null);
+  
 
   async function loadMenu() {
-    const response = await api.get("/menu");
-    setProducts(response.data);
+    const { data } = await api.get("/menu");
+    setProducts(data || []);
   }
 
   useEffect(() => {
-  async function init() {
-    try {
-      await api.get(`/public/table/${numero}/${token}`);
-      setTableValid(true);
-      loadMenu();
-    } catch (error) {
-      setTableError(
-        error.response?.data?.error || "QR Code inválido ou restaurante fechado."
-      );
+    async function init() {
+      try {
+        await api.get(`/public/table/${numero}/${token}`);
+        setTableValid(true);
+        loadMenu();
+      } catch (error) {
+        setTableError(error.response?.data?.error || "QR Code inválido ou restaurante fechado.");
+      }
     }
-  }
 
-  init();
-}, [numero, token]);
+    init();
+  }, [numero, token]);
 
   const categories = useMemo(() => {
     const unique = products
@@ -47,7 +47,7 @@ export default function MenuPage() {
         return acc;
       }, []);
 
-    return [{ name: "Todos", slug: "todos" }, ...unique];
+    return [{ name: "Burgers", slug: "todos", icon: "🍔" }, ...unique.map((c) => ({ ...c, icon: "✦" }))];
   }, [products]);
 
   const filteredProducts =
@@ -55,24 +55,20 @@ export default function MenuPage() {
       ? products
       : products.filter((p) => p.category?.slug === activeCategory);
 
-  const total = cart.reduce(
-    (sum, item) => sum + Number(item.price) * item.quantity,
-    0
-  );
-
+  const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const heroImage =
+    products.find((p) => p.image_url)?.image_url ||
+    "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1400&auto=format&fit=crop";
 
   function addToCart(product) {
     const exists = cart.find((item) => item.id === product.id);
 
     if (exists) {
-      setCart(
-        cart.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      );
+      setCart(cart.map((item) =>
+        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+      ));
     } else {
       setCart([
         ...cart,
@@ -80,34 +76,29 @@ export default function MenuPage() {
           id: product.id,
           name: product.name,
           price: product.price,
+          image_url: product.image_url,
           quantity: 1,
         },
       ]);
     }
 
-    setDrawerOpen(true);
+    setCartOpen(true);
   }
 
-  function decreaseItem(productId) {
-    setCart(
-      cart
-        .map((item) =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity - 1 }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    );
+  function decreaseItem(id) {
+    setCart(cart.map((item) =>
+      item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+    ).filter((item) => item.quantity > 0));
   }
 
-  function increaseItem(productId) {
-    setCart(
-      cart.map((item) =>
-        item.id === productId
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
-      )
-    );
+  function increaseItem(id) {
+    setCart(cart.map((item) =>
+      item.id === id ? { ...item, quantity: item.quantity + 1 } : item
+    ));
+  }
+
+  function removeItem(id) {
+    setCart(cart.filter((item) => item.id !== id));
   }
 
   async function submitOrder() {
@@ -116,15 +107,10 @@ export default function MenuPage() {
       return;
     }
 
-    if (cart.length === 0) {
-      alert("Adicione pelo menos um item.");
-      return;
-    }
-
     try {
       setLoading(true);
 
-      const response = await api.post("/orders", {
+      const { data } = await api.post("/orders", {
         table_number: Number(numero),
         table_token: token,
         name: customer.name,
@@ -136,9 +122,10 @@ export default function MenuPage() {
         })),
       });
 
-      setSuccessOrder(response.data);
+      setSuccessOrder(data);
       setCart([]);
-      setDrawerOpen(false);
+      setCartOpen(false);
+      setCheckoutOpen(false);
       setCustomer({ name: "", phone: "" });
       setNotes("");
     } catch (error) {
@@ -148,42 +135,38 @@ export default function MenuPage() {
     }
   }
 
+  if (tableError) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+        <section className="text-center max-w-md">
+          <div className="text-6xl">🔒</div>
+          <h1 className="text-3xl font-semibold mt-6">Acesso indisponível</h1>
+          <p className="text-zinc-400 mt-3">{tableError}</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!tableValid) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center">
+        <p className="text-amber-400 tracking-[0.3em] uppercase">Carregando cardápio...</p>
+      </main>
+    );
+  }
+
   if (successOrder) {
     return (
-      <main className="min-h-screen bg-[#070707] text-white px-5 py-10">
-        <section className="max-w-md mx-auto text-center">
-          <div className="mx-auto w-24 h-24 rounded-full bg-amber-400 text-black flex items-center justify-center text-5xl shadow-[0_0_60px_rgba(251,191,36,0.35)]">
+      <main className="min-h-screen bg-black text-white flex items-center justify-center px-5">
+        <section className="max-w-md w-full text-center">
+          <div className="w-24 h-24 rounded-full bg-amber-400 text-black flex items-center justify-center text-5xl mx-auto">
             ✓
           </div>
-
-          <p className="mt-8 text-amber-400 uppercase tracking-[0.35em] text-xs">
-            The Secret Burger
-          </p>
-
-          <h1 className="text-4xl font-black mt-3">Pedido recebido</h1>
-
-          <p className="text-zinc-400 mt-3">
-            A cozinha já recebeu seu pedido. Agora é só aguardar.
-          </p>
-
-          <div className="mt-8 bg-zinc-900/80 border border-zinc-800 rounded-3xl p-6 text-left">
-            <p className="text-sm text-zinc-500">Mesa</p>
-            <p className="text-xl font-bold">#{numero}</p>
-
-            <p className="text-sm text-zinc-500 mt-5">Status</p>
-            <p className="text-amber-400 font-bold uppercase">
-              {successOrder.status}
-            </p>
-
-            <p className="text-sm text-zinc-500 mt-5">Total</p>
-            <p className="text-3xl font-black">
-              R$ {Number(successOrder.total).toFixed(2)}
-            </p>
-          </div>
-
+          <h1 className="text-4xl font-semibold mt-8">Pedido recebido</h1>
+          <p className="text-zinc-400 mt-3">Seu pedido foi enviado para a cozinha.</p>
           <button
             onClick={() => setSuccessOrder(null)}
-            className="mt-8 w-full bg-amber-400 text-black py-4 rounded-2xl font-black"
+            className="mt-8 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
           >
             Fazer outro pedido
           </button>
@@ -192,202 +175,305 @@ export default function MenuPage() {
     );
   }
 
-  if (tableError) {
   return (
-    <main className="min-h-screen bg-[#070707] text-white px-5 py-10 flex items-center">
-      <section className="max-w-md mx-auto text-center">
-        <div className="text-6xl">🔒</div>
-        <h1 className="text-3xl font-black mt-6">Acesso indisponível</h1>
-        <p className="text-zinc-400 mt-3">{tableError}</p>
-      </section>
-    </main>
-  );
-}
+    <main className="min-h-screen bg-black text-white pb-28">
+      <section className="relative min-h-[560px] overflow-hidden">
+        <div className="absolute inset-0 bg-black" />
+        <img
+          src={heroImage}
+          alt="Burger"
+          className="absolute right-[-160px] md:right-0 top-0 h-full w-[85%] object-cover opacity-95"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
 
-if (!tableValid) {
-  return (
-    <main className="min-h-screen bg-[#070707] text-white px-5 py-10 flex items-center">
-      <section className="max-w-md mx-auto text-center">
-        <p className="text-amber-400 font-black">Carregando cardápio...</p>
-      </section>
-    </main>
-  );
-}
+        <div className="relative max-w-7xl mx-auto px-5 py-8">
+<header>
+  <img
+    src={logo}
+    alt="The Secret Burger"
+    className="h-24 md:h-28 w-auto object-contain"
+  />
+</header>
 
-  return (
-    <main className="min-h-screen bg-[#070707] text-white pb-32">
-      <section className="relative overflow-hidden px-5 pt-8 pb-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.22),transparent_45%)]" />
+          <div className="mt-24 max-w-xl">
+            <p className="text-amber-400 tracking-[0.55em] uppercase text-sm">
+              O hambúrguer
+            </p>
 
-        <div className="relative max-w-md mx-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-amber-400 text-xs tracking-[0.35em] uppercase">
-                Mesa #{numero}
-              </p>
-              <h1 className="text-4xl font-black mt-3 leading-none">
-                The Secret
-                <br />
-                Burger
-              </h1>
-            </div>
+            <h1 className="text-7xl md:text-8xl font-semibold leading-[0.85] mt-5">
+              SECRETO
+            </h1>
 
-            <div className="w-16 h-16 rounded-2xl bg-amber-400 text-black flex items-center justify-center font-black text-2xl shadow-[0_0_40px_rgba(251,191,36,0.35)]">
-              SB
-            </div>
-          </div>
+            <p className="text-2xl md:text-3xl text-amber-400 tracking-wide mt-5">
+              que você nunca esquece
+            </p>
 
-          <p className="mt-5 text-zinc-400 text-sm leading-relaxed">
-            Burgers artesanais, combos e sobremesas direto da sua mesa.
-          </p>
-
-          <div className="mt-8 flex gap-3 overflow-x-auto pb-2">
-            {categories.map((category) => (
-              <button
-                key={category.slug}
-                onClick={() => setActiveCategory(category.slug)}
-                className={`px-5 py-3 rounded-full whitespace-nowrap text-sm font-bold border ${
-                  activeCategory === category.slug
-                    ? "bg-amber-400 text-black border-amber-400"
-                    : "bg-zinc-900 text-zinc-300 border-zinc-800"
-                }`}
-              >
-                {category.name}
-              </button>
-            ))}
+    
           </div>
         </div>
       </section>
 
-      <section className="max-w-md mx-auto px-5 space-y-5">
-        {filteredProducts.map((product) => (
-          <article
-            key={product.id}
-            className="rounded-[28px] overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl"
-          >
-            <div className="h-40 bg-gradient-to-br from-zinc-800 to-black flex items-center justify-center">
-              <span className="text-6xl">🍔</span>
-            </div>
+      <nav className="sticky top-0 z-30 bg-black/85 backdrop-blur-2xl border-y border-white/10">
+        <div className="max-w-7xl mx-auto px-5 py-4 flex items-center gap-4 overflow-x-auto">
+          <div className="hidden md:block mr-6 leading-none">
+            <p className="font-semibold">THE SECRET</p>
+            <p className="font-semibold text-amber-400">BURGER.</p>
+          </div>
 
-            <div className="p-5">
-              <p className="text-xs uppercase tracking-[0.25em] text-amber-400">
-                {product.category?.name}
-              </p>
+          {categories.map((category) => (
+            <button
+              key={category.slug}
+              onClick={() => setActiveCategory(category.slug)}
+              className={`min-w-24 px-5 py-4 rounded-2xl text-sm transition border ${
+                activeCategory === category.slug
+                  ? "bg-white/10 border-white/10 text-amber-400"
+                  : "border-transparent text-zinc-400 hover:text-white"
+              }`}
+            >
+              <div className="text-xl mb-1">{category.icon}</div>
+              {category.name}
+            </button>
+          ))}
 
-              <h2 className="text-2xl font-black mt-2">{product.name}</h2>
+          {cart.length > 0 && (
+            <button
+              onClick={() => setCartOpen(true)}
+              className="ml-auto hidden lg:flex items-center gap-3 border border-amber-400/40 rounded-full px-6 py-3"
+            >
+              <span className="relative">
+                🛒
+                <span className="absolute -top-3 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {totalItems}
+                </span>
+              </span>
+              R$ {total.toFixed(2)}
+            </button>
+          )}
+        </div>
+      </nav>
 
-              <p className="text-zinc-400 text-sm mt-2 leading-relaxed">
-                {product.description}
-              </p>
+      <section id="menu" className="max-w-7xl mx-auto px-5 py-12">
+        <div className="grid lg:grid-cols-[1fr_440px] gap-10 items-start">
+          <div>
+            <p className="text-amber-400 uppercase tracking-[0.3em] text-sm">
+              {activeCategory === "todos" ? "Burgers" : categories.find((c) => c.slug === activeCategory)?.name}
+            </p>
+            <h2 className="text-4xl font-semibold mt-2">Feitos para quem leva o sabor a sério.</h2>
 
-              <div className="flex items-center justify-between mt-5">
-                <strong className="text-2xl text-amber-400">
-                  R$ {Number(product.price).toFixed(2)}
-                </strong>
-
-                <button
-                  onClick={() => addToCart(product)}
-                  className="bg-white text-black px-5 py-3 rounded-2xl font-black"
+            <div className="mt-8 space-y-4">
+              {filteredProducts.map((product) => (
+                <article
+                  key={product.id}
+                  className="bg-[#111] border border-white/10 rounded-[24px] overflow-hidden hover:border-amber-400/40 transition"
                 >
-                  Adicionar
-                </button>
-              </div>
+                  <div className="grid sm:grid-cols-[220px_1fr_80px]">
+                    <div className="h-48 sm:h-full bg-zinc-900">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-7xl">🍔</div>
+                      )}
+                    </div>
+
+                    <div className="p-6">
+                      <h3 className="text-2xl font-semibold">{product.name}</h3>
+                      <p className="text-zinc-400 mt-3 leading-relaxed">
+                        {product.description}
+                      </p>
+                      <p className="text-amber-400 text-2xl font-semibold mt-5">
+                        R$ {Number(product.price).toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="p-6 flex items-end">
+                      <button
+                        onClick={() => addToCart(product)}
+                        className="w-full sm:w-14 h-14 rounded-full border border-amber-400 text-amber-400 text-3xl hover:bg-amber-400 hover:text-black transition"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
-          </article>
-        ))}
+          </div>
+
+          <aside className="hidden lg:block sticky top-28 bg-[#111] border border-white/10 rounded-[32px] p-6">
+            <CartContent
+              cart={cart}
+              total={total}
+              increaseItem={increaseItem}
+              decreaseItem={decreaseItem}
+              removeItem={removeItem}
+              onCheckout={() => setCheckoutOpen(true)}
+            />
+          </aside>
+        </div>
       </section>
 
       {cart.length > 0 && (
         <button
-          onClick={() => setDrawerOpen(true)}
-          className="fixed bottom-5 left-5 right-5 max-w-md mx-auto bg-amber-400 text-black py-4 rounded-2xl font-black shadow-[0_0_50px_rgba(251,191,36,0.35)]"
+          onClick={() => setCartOpen(true)}
+          className="fixed bottom-5 left-5 right-5 md:left-1/2 md:-translate-x-1/2 md:w-[520px] z-40 bg-black/90 backdrop-blur-xl border border-white/15 rounded-[28px] px-6 py-4 flex items-center justify-between shadow-2xl"
         >
-          🛒 {totalItems} itens • R$ {total.toFixed(2)}
+          <span className="flex items-center gap-4">
+            <span className="relative text-2xl">
+              🛒
+              <span className="absolute -top-2 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                {totalItems}
+              </span>
+            </span>
+            <strong>R$ {total.toFixed(2)}</strong>
+          </span>
+          <span>Ver pedido ↑</span>
         </button>
       )}
 
-      {drawerOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
-          <div className="bg-zinc-950 border-t border-zinc-800 rounded-t-[32px] p-5 w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-black">Seu pedido</h2>
-              <button
-                onClick={() => setDrawerOpen(false)}
-                className="text-zinc-400 text-2xl"
-              >
-                ×
-              </button>
+      {cartOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end lg:hidden">
+          <aside className="w-full max-w-lg bg-[#111] h-full p-6 overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-semibold">Meu pedido</h3>
+              <button onClick={() => setCartOpen(false)} className="text-2xl">×</button>
             </div>
 
-            <div className="mt-5 space-y-4">
-              {cart.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-2xl p-4"
-                >
-                  <div>
-                    <p className="font-bold">{item.name}</p>
-                    <p className="text-sm text-zinc-400">
-                      R$ {Number(item.price).toFixed(2)}
-                    </p>
-                  </div>
+            <CartContent
+              cart={cart}
+              total={total}
+              increaseItem={increaseItem}
+              decreaseItem={decreaseItem}
+              removeItem={removeItem}
+              onCheckout={() => setCheckoutOpen(true)}
+            />
+          </aside>
+        </div>
+      )}
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => decreaseItem(item.id)}
-                      className="w-9 h-9 rounded-full bg-zinc-800"
-                    >
-                      -
-                    </button>
-                    <span className="font-bold">{item.quantity}</span>
-                    <button
-                      onClick={() => increaseItem(item.id)}
-                      className="w-9 h-9 rounded-full bg-zinc-800"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
+      {checkoutOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-end md:items-center justify-center p-4">
+          <div className="bg-[#111] border border-white/10 rounded-[32px] w-full max-w-md p-6">
+            <div className="flex justify-between">
+              <h3 className="text-2xl font-semibold">Finalizar pedido</h3>
+              <button onClick={() => setCheckoutOpen(false)} className="text-2xl">×</button>
             </div>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-6 space-y-3">
               <input
-                placeholder="Seu nome"
                 value={customer.name}
-                onChange={(e) =>
-                  setCustomer({ ...customer, name: e.target.value })
-                }
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-4 outline-none"
+                onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                placeholder="Seu nome"
+                className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
               />
-
               <input
-                placeholder="Telefone"
                 value={customer.phone}
-                onChange={(e) =>
-                  setCustomer({ ...customer, phone: e.target.value })
-                }
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-4 outline-none"
+                onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+                placeholder="Telefone"
+                className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
               />
-
               <textarea
-                placeholder="Observações do pedido"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-4 outline-none min-h-24"
+                placeholder="Observações"
+                className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none min-h-24"
               />
             </div>
 
             <button
               onClick={submitOrder}
               disabled={loading}
-              className="mt-5 w-full bg-amber-400 text-black py-4 rounded-2xl font-black disabled:opacity-60"
+              className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold disabled:opacity-50"
             >
-              {loading ? "Enviando..." : `Finalizar • R$ ${total.toFixed(2)}`}
+              {loading ? "Enviando..." : `Enviar pedido • R$ ${total.toFixed(2)}`}
             </button>
           </div>
         </div>
       )}
     </main>
+  );
+}
+
+function CartContent({ cart, total, increaseItem, decreaseItem, removeItem, onCheckout }) {
+  return (
+    <>
+      <h3 className="text-2xl font-semibold hidden lg:block">Meu pedido</h3>
+
+      {cart.length === 0 ? (
+        <div className="py-16 text-center text-zinc-500">Seu carrinho está vazio.</div>
+      ) : (
+        <div className="mt-6 space-y-5">
+          {cart.map((item) => (
+            <div key={item.id} className="flex gap-4 border-b border-white/10 pb-5">
+              <div className="w-20 h-20 rounded-2xl bg-zinc-900 overflow-hidden">
+                {item.image_url ? (
+                  <img src={item.image_url} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-3xl">🍔</div>
+                )}
+              </div>
+
+              <div className="flex-1">
+                <div className="flex justify-between">
+                  <p className="font-semibold">{item.name}</p>
+                  <button onClick={() => removeItem(item.id)} className="text-zinc-500">🗑️</button>
+                </div>
+
+                <p className="text-zinc-500 text-sm">1x R$ {Number(item.price).toFixed(2)}</p>
+
+                <div className="mt-3 flex justify-between items-center">
+                  <div className="flex border border-white/10 rounded-xl overflow-hidden">
+                    <button onClick={() => decreaseItem(item.id)} className="w-8 h-8 bg-white/5">-</button>
+                    <span className="w-8 h-8 flex items-center justify-center">{item.quantity}</span>
+                    <button onClick={() => increaseItem(item.id)} className="w-8 h-8 bg-white/5">+</button>
+                  </div>
+
+                  <p className="text-amber-400 font-semibold">
+                    R$ {(Number(item.price) * item.quantity).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <div className="pt-4">
+            <div className="flex justify-between text-zinc-400">
+              <span>Subtotal</span>
+              <span>R$ {total.toFixed(2)}</span>
+            </div>
+
+            <div className="flex justify-between text-xl mt-4">
+              <strong>Total</strong>
+              <strong className="text-amber-400">R$ {total.toFixed(2)}</strong>
+            </div>
+
+            <button
+              onClick={onCheckout}
+              className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
+            >
+              Finalizar pedido
+            </button>
+
+            <p className="text-center text-zinc-500 text-sm mt-4">
+              Pedido seguro e protegido
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function Feature({ icon, title, subtitle }) {
+  return (
+    <div className="text-center">
+      <p className="text-2xl text-amber-400">{icon}</p>
+      <p className="mt-2 text-sm font-semibold uppercase">{title}</p>
+      <p className="text-xs text-zinc-500 uppercase">{subtitle}</p>
+    </div>
   );
 }

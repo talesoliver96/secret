@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import api from "../api/axios";
 
 const menuGroups = [
   {
@@ -38,6 +39,42 @@ export default function AdminLayout({
   alertCount = 0,
   onEnableAlerts,
 }) {
+  const [globalAlertCount, setGlobalAlertCount] = useState(0);
+
+const visibleAlertCount = alertCount || globalAlertCount;
+
+async function loadGlobalAlerts() {
+  try {
+    const { data } = await api.get(
+      "/admin/orders?page=1&limit=1&status=recebido"
+    );
+
+    setGlobalAlertCount(data.pagination?.total || 0);
+  } catch {}
+}
+
+useEffect(() => {
+  loadGlobalAlerts();
+
+  const interval = setInterval(loadGlobalAlerts, 5000);
+
+  return () => clearInterval(interval);
+}, []);
+
+async function loadGlobalAlerts() {
+  try {
+    const { data } = await api.get("/admin/orders?page=1&limit=1&status=recebido");
+    setGlobalAlertCount(data.pagination?.total || 0);
+  } catch {}
+}
+
+useEffect(() => {
+  loadGlobalAlerts();
+
+  const interval = setInterval(loadGlobalAlerts, 5000);
+
+  return () => clearInterval(interval);
+}, []);
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
@@ -95,9 +132,9 @@ export default function AdminLayout({
                       <span className="text-base">{item.icon}</span>
                       <span>{item.label}</span>
 
-                      {item.path === "/admin/orders" && alertCount > 0 && (
+                      {item.path === "/admin/orders" && visibleAlertCount > 0 && (
                         <span className="ml-auto min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[11px] flex items-center justify-center">
-                          {alertCount}
+                          {visibleAlertCount}
                         </span>
                       )}
                     </Link>
@@ -112,18 +149,18 @@ export default function AdminLayout({
           <button
             onClick={onEnableAlerts}
             className={`w-full rounded-2xl px-4 py-3 text-left transition ${
-              alertCount > 0
+              visibleAlertCount > 0
                 ? "bg-red-50 text-red-700 border border-red-100"
                 : "bg-slate-50 text-slate-600 border border-slate-100"
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Alertas de pedidos</span>
-              <span>{alertCount > 0 ? "🔴" : "🔔"}</span>
+              <span>{visibleAlertCount > 0 ? "🔴" : "🔔"}</span>
             </div>
             <p className="text-xs mt-1 opacity-75">
-              {alertCount > 0
-                ? `${alertCount} aguardando preparo`
+              {visibleAlertCount > 0
+                ? `${visibleAlertCount} aguardando preparo`
                 : "Clique para ativar som"}
             </p>
           </button>
@@ -176,7 +213,7 @@ export default function AdminLayout({
               <button
                 onClick={onEnableAlerts}
                 className={`relative w-11 h-11 rounded-2xl flex items-center justify-center ${
-                  alertCount > 0
+                  visibleAlertCount > 0
                     ? "bg-red-600 text-white"
                     : "bg-slate-100 text-slate-700"
                 }`}
@@ -184,7 +221,7 @@ export default function AdminLayout({
                 🔔
                 {alertCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-white text-red-600 text-[11px] font-semibold flex items-center justify-center">
-                    {alertCount}
+                    {visibleAlertCount}
                   </span>
                 )}
               </button>

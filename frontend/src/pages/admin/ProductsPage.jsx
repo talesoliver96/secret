@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import api from "../../api/axios";
+import PremiumPagination from "../../components/PremiumPagination";
 
 const emptyForm = {
   name: "",
@@ -28,6 +29,9 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("todos");
   const [availabilityFilter, setAvailabilityFilter] = useState("todos");
   const [loading, setLoading] = useState(false);
+
+  const [page, setPage] = useState(1);
+const itemsPerPage = 10;
 
   async function loadData() {
     const [productsResponse, categoriesResponse] = await Promise.all([
@@ -64,6 +68,11 @@ export default function ProductsPage() {
       return matchSearch && matchCategory && matchAvailability;
     });
   }, [products, search, categoryFilter, availabilityFilter]);
+
+  const paginatedProducts = filteredProducts.slice(
+  (page - 1) * itemsPerPage,
+  page * itemsPerPage
+);
 
   function openCreate() {
     setEditing(null);
@@ -145,6 +154,10 @@ export default function ProductsPage() {
     }
   }
 
+  useEffect(() => {
+  setPage(1);
+}, [search, categoryFilter, availabilityFilter]);
+
   return (
     <AdminLayout
       title="Cardápio"
@@ -222,7 +235,7 @@ export default function ProductsPage() {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {filteredProducts.map((product) => (
+              {paginatedProducts.map((product) => (
                 <tr key={product.id} className="hover:bg-slate-50/70 transition">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-4">
@@ -308,6 +321,12 @@ export default function ProductsPage() {
               )}
             </tbody>
           </table>
+          <PremiumPagination
+  totalItems={filteredProducts.length}
+  itemsPerPage={itemsPerPage}
+  currentPage={page}
+  onPageChange={setPage}
+/>
         </div>
       </section>
 

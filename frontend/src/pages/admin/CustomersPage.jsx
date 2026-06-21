@@ -24,6 +24,8 @@ export default function CustomersPage() {
   const [editing, setEditing] = useState(null);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerOrders, setCustomerOrders] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "" });
   const [loading, setLoading] = useState(false);
 
@@ -38,8 +40,9 @@ export default function CustomersPage() {
     setCustomers(data || []);
   }
 
-  async function loadCustomerOrders(customer) {
+  async function openHistory(customer) {
     setSelectedCustomer(customer);
+    setHistoryOpen(true);
 
     const { data } = await api.get(`/admin/customers/${customer.id}/orders`);
     setCustomerOrders(data || []);
@@ -53,17 +56,19 @@ export default function CustomersPage() {
     return () => clearTimeout(timeout);
   }, [search]);
 
-  function startEdit(customer) {
+  function openEdit(customer) {
     setEditing(customer);
     setForm({
       name: customer.name || "",
       phone: customer.phone || "",
     });
+    setDrawerOpen(true);
   }
 
-  function resetEdit() {
+  function closeDrawer() {
     setEditing(null);
     setForm({ name: "", phone: "" });
+    setDrawerOpen(false);
   }
 
   async function saveCustomer(e) {
@@ -78,7 +83,7 @@ export default function CustomersPage() {
 
     try {
       await api.patch(`/admin/customers/${editing.id}`, form);
-      resetEdit();
+      closeDrawer();
       await loadCustomers();
     } catch (error) {
       alert(error.response?.data?.error || "Erro ao salvar cliente.");
@@ -122,141 +127,212 @@ export default function CustomersPage() {
       subtitle="Consulte clientes, telefones, histórico de pedidos e valor gasto."
     >
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Metric title="Clientes encontrados" value={totals.totalCustomers} />
+        <Metric title="Clientes" value={totals.totalCustomers} />
         <Metric title="Pedidos vinculados" value={totals.totalOrders} />
         <Metric title="Total pago" value={money(totals.totalSpent)} />
       </div>
 
-      <section className="grid grid-cols-1 2xl:grid-cols-3 gap-5">
-        {editing && (
-          <form
-            onSubmit={saveCustomer}
-            className="admin-card p-6 2xl:col-span-1"
-          >
-            <h3 className="text-2xl font-semibold">Editar cliente</h3>
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-semibold">Base de clientes</h3>
+            <p className="text-sm text-slate-500">
+              {customers.length} cliente(s) encontrado(s)
+            </p>
+          </div>
+        </div>
 
-            <div className="mt-5 space-y-3">
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Nome"
-                className="admin-input"
-              />
+        <div className="p-5 border-b border-slate-100 bg-slate-50/60">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome ou telefone..."
+            className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          />
+        </div>
 
-              <input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="Telefone"
-                className="admin-input"
-              />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px]">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Cliente
+                </th>
+                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Telefone
+                </th>
+                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Pedidos
+                </th>
+                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Total gasto
+                </th>
+                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Último pedido
+                </th>
+                <th className="text-right px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100">
+              {customers.map((customer) => (
+                <tr key={customer.id} className="hover:bg-slate-50/70 transition">
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-700 font-medium">
+                        {customer.name?.charAt(0)?.toUpperCase() || "C"}
+                      </div>
+
+                      <div>
+                        <p className="font-medium text-slate-900">
+                          {customer.name}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          Cliente cadastrado
+                        </p>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td className="px-5 py-4 text-sm text-slate-600">
+                    {customer.phone}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    <span className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-medium">
+                      {customer.orders_count || 0} pedido(s)
+                    </span>
+                  </td>
+
+                  <td className="px-5 py-4 text-sm font-medium text-slate-900">
+                    {money(customer.total_spent)}
+                  </td>
+
+                  <td className="px-5 py-4 text-sm text-slate-600">
+                    {dateTime(customer.last_order_at)}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => openHistory(customer)}
+                        className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100"
+                        title="Histórico"
+                      >
+                        🕒
+                      </button>
+
+                      <button
+                        onClick={() => openEdit(customer)}
+                        className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100"
+                        title="Editar"
+                      >
+                        ✏️
+                      </button>
+
+                      <button
+                        onClick={() => deleteCustomer(customer)}
+                        className="w-9 h-9 rounded-xl border border-red-100 text-red-600 hover:bg-red-50"
+                        title="Excluir"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {customers.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="px-5 py-14 text-center">
+                    <p className="text-slate-500">Nenhum cliente encontrado.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex justify-end">
+          <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col">
+            <div className="h-20 px-6 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500">Edição de cliente</p>
+                <h3 className="text-xl font-semibold">Editar cliente</h3>
+              </div>
 
               <button
-                disabled={loading}
-                className="w-full admin-btn-primary py-4 disabled:opacity-50"
+                onClick={closeDrawer}
+                className="w-10 h-10 rounded-full bg-slate-100 text-xl"
               >
-                {loading ? "Salvando..." : "Salvar alterações"}
+                ×
               </button>
+            </div>
 
+            <form onSubmit={saveCustomer} className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-5">
+                <Field label="Nome">
+                  <input
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm({ ...form, name: e.target.value })
+                    }
+                    placeholder="Nome do cliente"
+                    className="admin-input"
+                  />
+                </Field>
+
+                <Field label="Telefone">
+                  <input
+                    value={form.phone}
+                    onChange={(e) =>
+                      setForm({ ...form, phone: e.target.value })
+                    }
+                    placeholder="Telefone"
+                    className="admin-input"
+                  />
+                </Field>
+              </div>
+            </form>
+
+            <div className="p-6 border-t border-slate-100 flex gap-3">
               <button
-                type="button"
-                onClick={resetEdit}
-                className="w-full admin-btn-muted py-4"
+                onClick={closeDrawer}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-2xl font-medium"
               >
                 Cancelar
               </button>
-            </div>
-          </form>
-        )}
 
-        <section
-          className={`admin-card overflow-hidden ${
-            editing ? "2xl:col-span-2" : "2xl:col-span-3"
-          }`}
-        >
-          <div className="p-5 border-b border-slate-100">
-            <h3 className="text-2xl font-semibold">Base de clientes</h3>
-            <p className="text-slate-500 text-sm">
-              Busque por nome ou telefone.
-            </p>
-
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar cliente..."
-              className="admin-input mt-5"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4 p-5">
-            {customers.map((customer) => (
-              <article
-                key={customer.id}
-                className="border border-slate-200 rounded-3xl p-5 bg-white"
+              <button
+                onClick={saveCustomer}
+                disabled={loading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-2xl font-medium disabled:opacity-50"
               >
-                <div className="flex justify-between gap-3">
-                  <div>
-                    <h4 className="text-xl font-semibold">{customer.name}</h4>
-                    <p className="text-slate-500 text-sm">{customer.phone}</p>
-                  </div>
-
-                  <span className="h-fit px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-medium">
-                    Cliente
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-5">
-                  <Info title="Pedidos" value={customer.orders_count || 0} />
-                  <Info title="Pagos" value={customer.paid_orders_count || 0} />
-                  <Info title="Gasto" value={money(customer.total_spent)} />
-                  <Info title="Último pedido" value={dateTime(customer.last_order_at)} />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    onClick={() => loadCustomerOrders(customer)}
-                    className="admin-btn-dark py-3"
-                  >
-                    Histórico
-                  </button>
-
-                  <button
-                    onClick={() => startEdit(customer)}
-                    className="admin-btn-muted py-3"
-                  >
-                    Editar
-                  </button>
-
-                  <button
-                    onClick={() => deleteCustomer(customer)}
-                    className="admin-btn-danger py-3"
-                  >
-                    Excluir
-                  </button>
-                </div>
-              </article>
-            ))}
+                {loading ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
           </div>
-        </section>
-      </section>
+        </div>
+      )}
 
-      {selectedCustomer && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end lg:items-center justify-center p-3 sm:p-4">
-          <div className="bg-white w-full max-w-3xl rounded-[32px] p-5 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between gap-4">
+      {historyOpen && selectedCustomer && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex justify-end">
+          <div className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col">
+            <div className="h-20 px-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <p className="text-blue-600 font-semibold uppercase tracking-[0.2em] text-xs">
-                  Histórico do cliente
-                </p>
-
-                <h3 className="text-3xl font-semibold mt-2">
+                <p className="text-sm text-slate-500">Histórico do cliente</p>
+                <h3 className="text-xl font-semibold">
                   {selectedCustomer.name}
                 </h3>
-
-                <p className="text-slate-500">{selectedCustomer.phone}</p>
               </div>
 
               <button
                 onClick={() => {
+                  setHistoryOpen(false);
                   setSelectedCustomer(null);
                   setCustomerOrders([]);
                 }}
@@ -266,53 +342,57 @@ export default function CustomersPage() {
               </button>
             </div>
 
-            <div className="mt-6 space-y-4">
+            <div className="flex-1 overflow-y-auto p-6">
               {customerOrders.length === 0 ? (
                 <div className="bg-slate-50 rounded-3xl p-8 text-center">
                   <p className="text-slate-500">Nenhum pedido encontrado.</p>
                 </div>
               ) : (
-                customerOrders.map((order) => (
-                  <div key={order.id} className="bg-slate-50 rounded-3xl p-5">
-                    <div className="flex justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">
-                          Mesa {order.table_number}
-                        </p>
+                <div className="space-y-4">
+                  {customerOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="border border-slate-200 rounded-3xl p-5"
+                    >
+                      <div className="flex justify-between gap-3">
+                        <div>
+                          <p className="font-medium">
+                            Mesa {order.table_number}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            {dateTime(order.created_at)}
+                          </p>
 
-                        <p className="text-sm text-slate-500">
-                          {dateTime(order.created_at)}
-                        </p>
-
-                        <div className="mt-2 flex gap-2 flex-wrap">
-                          <Badge>{order.status}</Badge>
-                          <Badge>{order.payment_status || "pendente"}</Badge>
+                          <div className="mt-2 flex gap-2 flex-wrap">
+                            <Badge>{order.status}</Badge>
+                            <Badge>{order.payment_status || "pendente"}</Badge>
+                          </div>
                         </div>
+
+                        <p className="text-lg font-semibold">
+                          {money(order.total)}
+                        </p>
                       </div>
 
-                      <p className="text-xl font-semibold">
-                        {money(order.total)}
-                      </p>
-                    </div>
+                      <div className="mt-4 space-y-2">
+                        {order.order_items?.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex justify-between gap-3 text-sm"
+                          >
+                            <p>
+                              {item.quantity}x {item.product_name}
+                            </p>
 
-                    <div className="mt-4 space-y-2">
-                      {order.order_items?.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex justify-between gap-3 text-sm"
-                        >
-                          <p>
-                            {item.quantity}x {item.product_name}
-                          </p>
-
-                          <p className="font-medium">
-                            {money(item.subtotal)}
-                          </p>
-                        </div>
-                      ))}
+                            <p className="font-medium">
+                              {money(item.subtotal)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -324,25 +404,25 @@ export default function CustomersPage() {
 
 function Metric({ title, value }) {
   return (
-    <div className="admin-card p-5">
+    <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-5">
       <p className="text-sm text-slate-500">{title}</p>
       <p className="text-2xl font-semibold mt-1">{value}</p>
     </div>
   );
 }
 
-function Info({ title, value }) {
+function Field({ label, children }) {
   return (
-    <div className="bg-slate-50 rounded-2xl p-3">
-      <p className="text-xs text-slate-500">{title}</p>
-      <p className="font-medium mt-1 break-words">{value}</p>
-    </div>
+    <label className="block">
+      <p className="text-sm font-medium text-slate-700 mb-2">{label}</p>
+      {children}
+    </label>
   );
 }
 
 function Badge({ children }) {
   return (
-    <span className="px-3 py-1 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-medium">
+    <span className="px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
       {children}
     </span>
   );
