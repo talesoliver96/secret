@@ -17,7 +17,6 @@ export default function MenuPage() {
   const [tableError, setTableError] = useState("");
   const [loading, setLoading] = useState(false);
   const [successOrder, setSuccessOrder] = useState(null);
-  
 
   async function loadMenu() {
     const { data } = await api.get("/menu");
@@ -31,12 +30,28 @@ export default function MenuPage() {
         setTableValid(true);
         loadMenu();
       } catch (error) {
-        setTableError(error.response?.data?.error || "QR Code inválido ou restaurante fechado.");
+        setTableError(
+          error.response?.data?.error ||
+            "QR Code inválido ou restaurante fechado."
+        );
       }
     }
 
     init();
   }, [numero, token]);
+
+  function getCategoryIcon(category) {
+    const slug = category?.slug?.toLowerCase() || "";
+    const name = category?.name?.toLowerCase() || "";
+
+    if (slug === "todos") return "🍔";
+    if (slug.includes("bebida") || name.includes("bebida")) return "🥤";
+    if (slug.includes("sobremesa") || name.includes("sobremesa")) return "🍰";
+    if (slug.includes("combo") || name.includes("combo")) return "✦";
+    if (slug.includes("burger") || name.includes("burger")) return "🍔";
+
+    return "◌";
+  }
 
   const categories = useMemo(() => {
     const unique = products
@@ -47,7 +62,13 @@ export default function MenuPage() {
         return acc;
       }, []);
 
-    return [{ name: "Burgers", slug: "todos", icon: "🍔" }, ...unique.map((c) => ({ ...c, icon: "✦" }))];
+    return [
+      { name: "Burgers", slug: "todos", icon: "🍔" },
+      ...unique.map((category) => ({
+        ...category,
+        icon: getCategoryIcon(category),
+      })),
+    ];
   }, [products]);
 
   const filteredProducts =
@@ -55,7 +76,11 @@ export default function MenuPage() {
       ? products
       : products.filter((p) => p.category?.slug === activeCategory);
 
-  const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+  const total = cart.reduce(
+    (sum, item) => sum + Number(item.price) * item.quantity,
+    0
+  );
+
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const heroImage =
@@ -66,9 +91,13 @@ export default function MenuPage() {
     const exists = cart.find((item) => item.id === product.id);
 
     if (exists) {
-      setCart(cart.map((item) =>
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
+      setCart(
+        cart.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      );
     } else {
       setCart([
         ...cart,
@@ -86,15 +115,21 @@ export default function MenuPage() {
   }
 
   function decreaseItem(id) {
-    setCart(cart.map((item) =>
-      item.id === id ? { ...item, quantity: item.quantity - 1 } : item
-    ).filter((item) => item.quantity > 0));
+    setCart(
+      cart
+        .map((item) =>
+          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
   }
 
   function increaseItem(id) {
-    setCart(cart.map((item) =>
-      item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-    ));
+    setCart(
+      cart.map((item) =>
+        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
+      )
+    );
   }
 
   function removeItem(id) {
@@ -150,7 +185,9 @@ export default function MenuPage() {
   if (!tableValid) {
     return (
       <main className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p className="text-amber-400 tracking-[0.3em] uppercase">Carregando cardápio...</p>
+        <p className="text-amber-400 tracking-[0.3em] uppercase">
+          Carregando cardápio...
+        </p>
       </main>
     );
   }
@@ -162,8 +199,13 @@ export default function MenuPage() {
           <div className="w-24 h-24 rounded-full bg-amber-400 text-black flex items-center justify-center text-5xl mx-auto">
             ✓
           </div>
+
           <h1 className="text-4xl font-semibold mt-8">Pedido recebido</h1>
-          <p className="text-zinc-400 mt-3">Seu pedido foi enviado para a cozinha.</p>
+
+          <p className="text-zinc-400 mt-3">
+            Seu pedido foi enviado para a cozinha.
+          </p>
+
           <button
             onClick={() => setSuccessOrder(null)}
             className="mt-8 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
@@ -177,24 +219,26 @@ export default function MenuPage() {
 
   return (
     <main className="min-h-screen bg-black text-white pb-28">
-      <section className="relative min-h-[560px] overflow-hidden">
+      <section className="relative min-h-[560px] overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-black" />
+
         <img
           src={heroImage}
           alt="Burger"
           className="absolute right-[-160px] md:right-0 top-0 h-full w-[85%] object-cover opacity-95"
         />
+
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/10" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
 
         <div className="relative max-w-7xl mx-auto px-5 py-8">
-<header>
-  <img
-    src={logo}
-    alt="The Secret Burger"
-    className="h-24 md:h-28 w-auto object-contain"
-  />
-</header>
+          <header>
+            <img
+              src={logo}
+              alt="The Secret Burger"
+              className="h-24 md:h-28 w-auto object-contain"
+            />
+          </header>
 
           <div className="mt-24 max-w-xl">
             <p className="text-amber-400 tracking-[0.55em] uppercase text-sm">
@@ -208,48 +252,62 @@ export default function MenuPage() {
             <p className="text-2xl md:text-3xl text-amber-400 tracking-wide mt-5">
               que você nunca esquece
             </p>
-
-    
           </div>
         </div>
       </section>
 
-      <nav className="sticky top-0 z-30 bg-black/85 backdrop-blur-2xl border-y border-white/10">
-        <div className="max-w-7xl mx-auto px-5 py-4 flex items-center gap-4 overflow-x-auto">
-          <div className="hidden md:block mr-6 leading-none">
-            <p className="font-semibold">THE SECRET</p>
-            <p className="font-semibold text-amber-400">BURGER.</p>
-          </div>
+      <nav className="sticky top-0 z-30 bg-black/90 backdrop-blur-2xl border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-5">
+          <div className="h-28 flex items-center gap-4 overflow-x-auto scrollbar-hide">
+            <div className="hidden md:block mr-8 shrink-0 leading-none">
+              <p className="text-sm font-semibold text-white">THE SECRET</p>
+              <p className="text-sm font-semibold text-amber-400">BURGER.</p>
+            </div>
 
-          {categories.map((category) => (
-            <button
-              key={category.slug}
-              onClick={() => setActiveCategory(category.slug)}
-              className={`min-w-24 px-5 py-4 rounded-2xl text-sm transition border ${
-                activeCategory === category.slug
-                  ? "bg-white/10 border-white/10 text-amber-400"
-                  : "border-transparent text-zinc-400 hover:text-white"
-              }`}
-            >
-              <div className="text-xl mb-1">{category.icon}</div>
-              {category.name}
-            </button>
-          ))}
+            <div className="flex items-center gap-3">
+              {categories.map((category) => {
+                const active = activeCategory === category.slug;
 
-          {cart.length > 0 && (
-            <button
-              onClick={() => setCartOpen(true)}
-              className="ml-auto hidden lg:flex items-center gap-3 border border-amber-400/40 rounded-full px-6 py-3"
-            >
-              <span className="relative">
-                🛒
-                <span className="absolute -top-3 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                  {totalItems}
+                return (
+                  <button
+                    key={category.slug}
+                    onClick={() => setActiveCategory(category.slug)}
+                    className={`relative min-w-[104px] h-20 rounded-[22px] border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${
+                      active
+                        ? "bg-white/[0.08] border-white/15 text-amber-400 shadow-[0_0_45px_rgba(245,158,11,.12)]"
+                        : "bg-transparent border-transparent text-zinc-500 hover:text-white hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {active && (
+                      <span className="absolute -top-px left-1/2 -translate-x-1/2 w-8 h-[2px] bg-amber-400 rounded-full" />
+                    )}
+
+                    <span className="text-xl leading-none">{category.icon}</span>
+
+                    <span className="text-xs md:text-sm font-medium">
+                      {category.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {cart.length > 0 && (
+              <button
+                onClick={() => setCartOpen(true)}
+                className="ml-auto hidden lg:flex items-center gap-4 rounded-full border border-amber-400/40 px-6 py-3 text-sm shrink-0 hover:bg-amber-400 hover:text-black transition"
+              >
+                <span className="relative text-xl">
+                  🛒
+                  <span className="absolute -top-3 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                    {totalItems}
+                  </span>
                 </span>
-              </span>
-              R$ {total.toFixed(2)}
-            </button>
-          )}
+
+                <span className="font-semibold">R$ {total.toFixed(2)}</span>
+              </button>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -257,9 +315,14 @@ export default function MenuPage() {
         <div className="grid lg:grid-cols-[1fr_440px] gap-10 items-start">
           <div>
             <p className="text-amber-400 uppercase tracking-[0.3em] text-sm">
-              {activeCategory === "todos" ? "Burgers" : categories.find((c) => c.slug === activeCategory)?.name}
+              {activeCategory === "todos"
+                ? "Burgers"
+                : categories.find((c) => c.slug === activeCategory)?.name}
             </p>
-            <h2 className="text-4xl font-semibold mt-2">Feitos para quem leva o sabor a sério.</h2>
+
+            <h2 className="text-4xl font-semibold mt-2">
+              Feitos para quem leva o sabor a sério.
+            </h2>
 
             <div className="mt-8 space-y-4">
               {filteredProducts.map((product) => (
@@ -276,15 +339,21 @@ export default function MenuPage() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="h-full flex items-center justify-center text-7xl">🍔</div>
+                        <div className="h-full flex items-center justify-center text-7xl">
+                          🍔
+                        </div>
                       )}
                     </div>
 
                     <div className="p-6">
-                      <h3 className="text-2xl font-semibold">{product.name}</h3>
+                      <h3 className="text-2xl font-semibold">
+                        {product.name}
+                      </h3>
+
                       <p className="text-zinc-400 mt-3 leading-relaxed">
                         {product.description}
                       </p>
+
                       <p className="text-amber-400 text-2xl font-semibold mt-5">
                         R$ {Number(product.price).toFixed(2)}
                       </p>
@@ -304,7 +373,7 @@ export default function MenuPage() {
             </div>
           </div>
 
-          <aside className="hidden lg:block sticky top-28 bg-[#111] border border-white/10 rounded-[32px] p-6">
+          <aside className="hidden lg:block sticky top-32 bg-[#111] border border-white/10 rounded-[32px] p-6">
             <CartContent
               cart={cart}
               total={total}
@@ -329,8 +398,10 @@ export default function MenuPage() {
                 {totalItems}
               </span>
             </span>
+
             <strong>R$ {total.toFixed(2)}</strong>
           </span>
+
           <span>Ver pedido ↑</span>
         </button>
       )}
@@ -340,7 +411,13 @@ export default function MenuPage() {
           <aside className="w-full max-w-lg bg-[#111] h-full p-6 overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-semibold">Meu pedido</h3>
-              <button onClick={() => setCartOpen(false)} className="text-2xl">×</button>
+
+              <button
+                onClick={() => setCartOpen(false)}
+                className="text-2xl"
+              >
+                ×
+              </button>
             </div>
 
             <CartContent
@@ -360,22 +437,34 @@ export default function MenuPage() {
           <div className="bg-[#111] border border-white/10 rounded-[32px] w-full max-w-md p-6">
             <div className="flex justify-between">
               <h3 className="text-2xl font-semibold">Finalizar pedido</h3>
-              <button onClick={() => setCheckoutOpen(false)} className="text-2xl">×</button>
+
+              <button
+                onClick={() => setCheckoutOpen(false)}
+                className="text-2xl"
+              >
+                ×
+              </button>
             </div>
 
             <div className="mt-6 space-y-3">
               <input
                 value={customer.name}
-                onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                onChange={(e) =>
+                  setCustomer({ ...customer, name: e.target.value })
+                }
                 placeholder="Seu nome"
                 className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
               />
+
               <input
                 value={customer.phone}
-                onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+                onChange={(e) =>
+                  setCustomer({ ...customer, phone: e.target.value })
+                }
                 placeholder="Telefone"
                 className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
               />
+
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -389,7 +478,9 @@ export default function MenuPage() {
               disabled={loading}
               className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold disabled:opacity-50"
             >
-              {loading ? "Enviando..." : `Enviar pedido • R$ ${total.toFixed(2)}`}
+              {loading
+                ? "Enviando..."
+                : `Enviar pedido • R$ ${total.toFixed(2)}`}
             </button>
           </div>
         </div>
@@ -398,38 +489,78 @@ export default function MenuPage() {
   );
 }
 
-function CartContent({ cart, total, increaseItem, decreaseItem, removeItem, onCheckout }) {
+function CartContent({
+  cart,
+  total,
+  increaseItem,
+  decreaseItem,
+  removeItem,
+  onCheckout,
+}) {
   return (
     <>
       <h3 className="text-2xl font-semibold hidden lg:block">Meu pedido</h3>
 
       {cart.length === 0 ? (
-        <div className="py-16 text-center text-zinc-500">Seu carrinho está vazio.</div>
+        <div className="py-16 text-center text-zinc-500">
+          Seu carrinho está vazio.
+        </div>
       ) : (
         <div className="mt-6 space-y-5">
           {cart.map((item) => (
-            <div key={item.id} className="flex gap-4 border-b border-white/10 pb-5">
+            <div
+              key={item.id}
+              className="flex gap-4 border-b border-white/10 pb-5"
+            >
               <div className="w-20 h-20 rounded-2xl bg-zinc-900 overflow-hidden">
                 {item.image_url ? (
-                  <img src={item.image_url} className="w-full h-full object-cover" />
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
-                  <div className="h-full flex items-center justify-center text-3xl">🍔</div>
+                  <div className="h-full flex items-center justify-center text-3xl">
+                    🍔
+                  </div>
                 )}
               </div>
 
               <div className="flex-1">
                 <div className="flex justify-between">
                   <p className="font-semibold">{item.name}</p>
-                  <button onClick={() => removeItem(item.id)} className="text-zinc-500">🗑️</button>
+
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    className="text-zinc-500"
+                  >
+                    🗑️
+                  </button>
                 </div>
 
-                <p className="text-zinc-500 text-sm">1x R$ {Number(item.price).toFixed(2)}</p>
+                <p className="text-zinc-500 text-sm">
+                  1x R$ {Number(item.price).toFixed(2)}
+                </p>
 
                 <div className="mt-3 flex justify-between items-center">
                   <div className="flex border border-white/10 rounded-xl overflow-hidden">
-                    <button onClick={() => decreaseItem(item.id)} className="w-8 h-8 bg-white/5">-</button>
-                    <span className="w-8 h-8 flex items-center justify-center">{item.quantity}</span>
-                    <button onClick={() => increaseItem(item.id)} className="w-8 h-8 bg-white/5">+</button>
+                    <button
+                      onClick={() => decreaseItem(item.id)}
+                      className="w-8 h-8 bg-white/5"
+                    >
+                      -
+                    </button>
+
+                    <span className="w-8 h-8 flex items-center justify-center">
+                      {item.quantity}
+                    </span>
+
+                    <button
+                      onClick={() => increaseItem(item.id)}
+                      className="w-8 h-8 bg-white/5"
+                    >
+                      +
+                    </button>
                   </div>
 
                   <p className="text-amber-400 font-semibold">
@@ -448,7 +579,9 @@ function CartContent({ cart, total, increaseItem, decreaseItem, removeItem, onCh
 
             <div className="flex justify-between text-xl mt-4">
               <strong>Total</strong>
-              <strong className="text-amber-400">R$ {total.toFixed(2)}</strong>
+              <strong className="text-amber-400">
+                R$ {total.toFixed(2)}
+              </strong>
             </div>
 
             <button
@@ -465,15 +598,5 @@ function CartContent({ cart, total, increaseItem, decreaseItem, removeItem, onCh
         </div>
       )}
     </>
-  );
-}
-
-function Feature({ icon, title, subtitle }) {
-  return (
-    <div className="text-center">
-      <p className="text-2xl text-amber-400">{icon}</p>
-      <p className="mt-2 text-sm font-semibold uppercase">{title}</p>
-      <p className="text-xs text-zinc-500 uppercase">{subtitle}</p>
-    </div>
   );
 }

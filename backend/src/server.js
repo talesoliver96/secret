@@ -16,6 +16,8 @@ const customersRoutes = require("./routes/customers.routes");
 const authRoutes = require("./routes/auth.routes");
 const authMiddleware = require("./middlewares/auth.middleware");
 
+const dangerRoutes = require("./routes/danger.routes");
+
 const app = express();
 
 app.use(
@@ -48,6 +50,8 @@ app.use("/api", authMiddleware, adminRoutes);
 app.use("/api", authMiddleware, settingsRoutes);
 app.use("/api", authMiddleware, customersRoutes);
 app.use("/api", authMiddleware, catalogRoutes);
+
+app.use("/api", dangerRoutes);
 
 app.get("/", (req, res) => {
   res.json({

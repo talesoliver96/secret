@@ -13,6 +13,7 @@ import ProductsPage from "./pages/admin/ProductsPage";
 import CategoriesPage from "./pages/admin/CategoriesPage";
 
 import PrivateRoute from "./components/PrivateRoute";
+import DangerZonePage from "./pages/admin/DangerZonePage";
 
 export default function App() {
   return (
@@ -38,6 +39,15 @@ export default function App() {
   element={
     <PrivateRoute>
       <OrdersPage />
+    </PrivateRoute>
+  }
+/>
+
+<Route
+  path="/admin/danger-zone"
+  element={
+    <PrivateRoute>
+      <DangerZonePage />
     </PrivateRoute>
   }
 />

@@ -19,4 +19,6 @@ router.get(
   settingsController.validatePublicTable
 );
 
+router.delete("/admin/restaurant-tables/:id", settingsController.deleteTable);
+
 module.exports = router;

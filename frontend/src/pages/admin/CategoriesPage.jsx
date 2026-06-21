@@ -7,6 +7,7 @@ const emptyForm = {
   name: "",
   slug: "",
   active: true,
+  display_order: 0,
 };
 
 function slugify(text) {
@@ -62,10 +63,11 @@ const itemsPerPage = 10;
   function openEdit(category) {
     setEditing(category);
     setForm({
-      name: category.name || "",
-      slug: category.slug || "",
-      active: category.active,
-    });
+  name: category.name || "",
+  slug: category.slug || "",
+  active: category.active,
+  display_order: category.display_order || 0,
+});
     setDrawerOpen(true);
   }
 
@@ -165,6 +167,9 @@ const itemsPerPage = 10;
                 <th className="text-right px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Ações
                 </th>
+                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+  Ordem
+</th>
               </tr>
             </thead>
 
@@ -190,6 +195,10 @@ const itemsPerPage = 10;
                   <td className="px-5 py-4 text-sm text-slate-600">
                     {category.slug}
                   </td>
+
+                  <td className="px-5 py-4 text-sm text-slate-600">
+  {category.display_order || 0}
+</td>
 
                   <td className="px-5 py-4">
                     <span
@@ -235,7 +244,7 @@ const itemsPerPage = 10;
 
               {filteredCategories.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="px-5 py-14 text-center">
+                  <td colSpan="5" className="px-5 py-14 text-center">
                     <p className="text-slate-500">Nenhuma categoria encontrada.</p>
                   </td>
                 </tr>
@@ -296,6 +305,18 @@ const itemsPerPage = 10;
                     className="admin-input"
                   />
                 </Field>
+
+                <Field label="Ordem de exibição">
+  <input
+    type="number"
+    value={form.display_order}
+    onChange={(e) =>
+      setForm({ ...form, display_order: Number(e.target.value) })
+    }
+    placeholder="0"
+    className="admin-input"
+  />
+</Field>
 
                 <label className="flex items-center justify-between gap-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
                   <div>

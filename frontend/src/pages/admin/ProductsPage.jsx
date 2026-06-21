@@ -10,6 +10,7 @@ const emptyForm = {
   image_url: "",
   category_id: "",
   available: true,
+  display_order: 0,
 };
 
 function money(value) {
@@ -83,13 +84,14 @@ const itemsPerPage = 10;
   function openEdit(product) {
     setEditing(product);
     setForm({
-      name: product.name || "",
-      description: product.description || "",
-      price: product.price || "",
-      image_url: product.image_url || "",
-      category_id: product.category_id || "",
-      available: product.available,
-    });
+  name: product.name || "",
+  description: product.description || "",
+  price: product.price || "",
+  image_url: product.image_url || "",
+  category_id: product.category_id || "",
+  available: product.available,
+  display_order: product.display_order || 0,
+});
     setDrawerOpen(true);
   }
 
@@ -231,6 +233,9 @@ const itemsPerPage = 10;
                 <th className="text-right px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Ações
                 </th>
+                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+  Ordem
+</th>
               </tr>
             </thead>
 
@@ -269,6 +274,10 @@ const itemsPerPage = 10;
                   <td className="px-5 py-4 text-sm font-medium text-slate-900">
                     {money(product.price)}
                   </td>
+
+                  <td className="px-5 py-4 text-sm text-slate-600">
+  {product.display_order || 0}
+</td>
 
                   <td className="px-5 py-4">
                     <span
@@ -314,7 +323,7 @@ const itemsPerPage = 10;
 
               {filteredProducts.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="px-5 py-14 text-center">
+                  <td colSpan="6" className="px-5 py-14 text-center">
                     <p className="text-slate-500">Nenhum produto encontrado.</p>
                   </td>
                 </tr>
@@ -401,6 +410,18 @@ const itemsPerPage = 10;
                       ))}
                     </select>
                   </Field>
+
+                  <Field label="Ordem de exibição">
+  <input
+    type="number"
+    value={form.display_order}
+    onChange={(e) =>
+      setForm({ ...form, display_order: Number(e.target.value) })
+    }
+    placeholder="0"
+    className="admin-input"
+  />
+</Field>
                 </div>
 
                 <Field label="URL da imagem">

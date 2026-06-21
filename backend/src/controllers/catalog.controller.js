@@ -4,7 +4,8 @@ exports.getCategories = async (req, res) => {
   const { data, error } = await supabase
     .from("categories")
     .select("*")
-    .order("name");
+    .order("display_order", { ascending: true })
+.order("name", { ascending: true });
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -12,7 +13,7 @@ exports.getCategories = async (req, res) => {
 };
 
 exports.createCategory = async (req, res) => {
-  const { name, slug, active = true } = req.body;
+  const { name, slug, active = true, display_order = 0 } = req.body;
 
   if (!name || !slug) {
     return res.status(400).json({ error: "Nome e slug são obrigatórios." });
@@ -20,7 +21,7 @@ exports.createCategory = async (req, res) => {
 
   const { data, error } = await supabase
     .from("categories")
-    .insert({ name, slug, active })
+    .insert({ name, slug, active, display_order })
     .select()
     .single();
 
@@ -31,11 +32,11 @@ exports.createCategory = async (req, res) => {
 
 exports.updateCategory = async (req, res) => {
   const { id } = req.params;
-  const { name, slug, active } = req.body;
+  const { name, slug, active, display_order } = req.body;
 
   const { data, error } = await supabase
     .from("categories")
-    .update({ name, slug, active })
+    .update({ name, slug, active, display_order })
     .eq("id", id)
     .select()
     .single();
@@ -77,7 +78,8 @@ exports.getProducts = async (req, res) => {
         slug
       )
     `)
-    .order("created_at", { ascending: false });
+    .order("display_order", { ascending: true })
+.order("created_at", { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -92,6 +94,7 @@ exports.createProduct = async (req, res) => {
     price,
     image_url,
     available = true,
+    display_order = 0,
   } = req.body;
 
   if (!category_id || !name || !price) {
@@ -109,6 +112,7 @@ exports.createProduct = async (req, res) => {
       price,
       image_url,
       available,
+      display_order,
     })
     .select()
     .single();
@@ -128,6 +132,7 @@ exports.updateProduct = async (req, res) => {
     price,
     image_url,
     available,
+    display_order,
   } = req.body;
 
   const { data, error } = await supabase
@@ -139,6 +144,7 @@ exports.updateProduct = async (req, res) => {
       price,
       image_url,
       available,
+      display_order,
     })
     .eq("id", id)
     .select()

@@ -1,18 +1,37 @@
 const supabase = require("../config/supabase");
 
+function getPagination(req) {
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  return { page, limit, from, to };
+}
+
+function buildPagination(page, limit, count) {
+  return {
+    page,
+    limit,
+    total: count || 0,
+    totalPages: Math.ceil((count || 0) / limit),
+  };
+}
+
 exports.getCustomers = async (req, res) => {
+  const { page, limit, from, to } = getPagination(req);
   const search = req.query.search || "";
 
   let query = supabase
     .from("customers")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`);
   }
 
-  const { data: customers, error } = await query;
+  const { data: customers, error, count } = await query.range(from, to);
 
   if (error) return res.status(500).json({ error: error.message });
 
@@ -21,12 +40,15 @@ exports.getCustomers = async (req, res) => {
   const { data: orders } = await supabase
     .from("orders")
     .select("id, customer_id, total, payment_status, created_at")
-    .in("customer_id", customerIds.length ? customerIds : ["00000000-0000-0000-0000-000000000000"]);
+    .in(
+      "customer_id",
+      customerIds.length ? customerIds : ["00000000-0000-0000-0000-000000000000"]
+    )
+    .order("created_at", { ascending: false });
 
   const result = customers.map((customer) => {
-    const customerOrders = orders?.filter(
-      (order) => order.customer_id === customer.id
-    ) || [];
+    const customerOrders =
+      orders?.filter((order) => order.customer_id === customer.id) || [];
 
     const paidOrders = customerOrders.filter(
       (order) => order.payment_status === "pago"
@@ -46,7 +68,10 @@ exports.getCustomers = async (req, res) => {
     };
   });
 
-  res.json(result);
+  res.json({
+    data: result,
+    pagination: buildPagination(page, limit, count),
+  });
 };
 
 exports.updateCustomer = async (req, res) => {

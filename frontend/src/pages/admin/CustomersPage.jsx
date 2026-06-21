@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
+import PremiumPagination from "../../components/PremiumPagination";
 import api from "../../api/axios";
 
 function money(value) {
@@ -20,24 +21,35 @@ function dateTime(date) {
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+
   const [editing, setEditing] = useState(null);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [customerOrders, setCustomerOrders] = useState([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerOrders, setCustomerOrders] = useState([]);
+
   const [form, setForm] = useState({ name: "", phone: "" });
   const [loading, setLoading] = useState(false);
 
-  async function loadCustomers() {
-    const params = new URLSearchParams();
+  const itemsPerPage = 10;
+
+  async function loadCustomers(nextPage = page) {
+    const params = new URLSearchParams({
+      page: String(nextPage),
+      limit: String(itemsPerPage),
+    });
 
     if (search.trim()) {
       params.append("search", search.trim());
     }
 
     const { data } = await api.get(`/admin/customers?${params.toString()}`);
-    setCustomers(data || []);
+
+    setCustomers(data.data || []);
+    setPagination(data.pagination);
   }
 
   async function openHistory(customer) {
@@ -49,12 +61,16 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
-      loadCustomers();
+      loadCustomers(page);
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [search]);
+  }, [page, search]);
 
   function openEdit(customer) {
     setEditing(customer);
@@ -84,7 +100,7 @@ export default function CustomersPage() {
     try {
       await api.patch(`/admin/customers/${editing.id}`, form);
       closeDrawer();
-      await loadCustomers();
+      await loadCustomers(page);
     } catch (error) {
       alert(error.response?.data?.error || "Erro ao salvar cliente.");
     } finally {
@@ -97,13 +113,13 @@ export default function CustomersPage() {
 
     try {
       await api.delete(`/admin/customers/${customer.id}`);
-      await loadCustomers();
+      await loadCustomers(page);
     } catch (error) {
       alert(error.response?.data?.error || "Erro ao excluir cliente.");
     }
   }
 
-  const totals = useMemo(() => {
+  const pageTotals = useMemo(() => {
     const totalSpent = customers.reduce(
       (sum, customer) => sum + Number(customer.total_spent || 0),
       0
@@ -114,22 +130,29 @@ export default function CustomersPage() {
       0
     );
 
+    const paidOrders = customers.reduce(
+      (sum, customer) => sum + Number(customer.paid_orders_count || 0),
+      0
+    );
+
     return {
-      totalCustomers: customers.length,
+      customers: pagination?.total || customers.length,
       totalOrders,
+      paidOrders,
       totalSpent,
     };
-  }, [customers]);
+  }, [customers, pagination]);
 
   return (
     <AdminLayout
       title="Clientes"
-      subtitle="Consulte clientes, telefones, histórico de pedidos e valor gasto."
+      subtitle="Base de clientes, histórico de pedidos, telefone e comportamento de compra."
     >
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <Metric title="Clientes" value={totals.totalCustomers} />
-        <Metric title="Pedidos vinculados" value={totals.totalOrders} />
-        <Metric title="Total pago" value={money(totals.totalSpent)} />
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+        <Metric title="Clientes" value={pageTotals.customers} />
+        <Metric title="Pedidos nesta página" value={pageTotals.totalOrders} />
+        <Metric title="Pedidos pagos" value={pageTotals.paidOrders} tone="green" />
+        <Metric title="Total pago página" value={money(pageTotals.totalSpent)} />
       </div>
 
       <section className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
@@ -137,7 +160,7 @@ export default function CustomersPage() {
           <div>
             <h3 className="text-xl font-semibold">Base de clientes</h3>
             <p className="text-sm text-slate-500">
-              {customers.length} cliente(s) encontrado(s)
+              {pagination?.total || customers.length} cliente(s) encontrado(s)
             </p>
           </div>
         </div>
@@ -151,114 +174,135 @@ export default function CustomersPage() {
           />
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Telefone
-                </th>
-                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Pedidos
-                </th>
-                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Total gasto
-                </th>
-                <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Último pedido
-                </th>
-                <th className="text-right px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-100">
-              {customers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-slate-50/70 transition">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-700 font-medium">
-                        {customer.name?.charAt(0)?.toUpperCase() || "C"}
-                      </div>
-
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {customer.name}
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          Cliente cadastrado
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {customer.phone}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span className="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 text-xs font-medium">
-                      {customer.orders_count || 0} pedido(s)
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4 text-sm font-medium text-slate-900">
-                    {money(customer.total_spent)}
-                  </td>
-
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {dateTime(customer.last_order_at)}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openHistory(customer)}
-                        className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100"
-                        title="Histórico"
-                      >
-                        🕒
-                      </button>
-
-                      <button
-                        onClick={() => openEdit(customer)}
-                        className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100"
-                        title="Editar"
-                      >
-                        ✏️
-                      </button>
-
-                      <button
-                        onClick={() => deleteCustomer(customer)}
-                        className="w-9 h-9 rounded-xl border border-red-100 text-red-600 hover:bg-red-50"
-                        title="Excluir"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {customers.length === 0 && (
+        {customers.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-5xl">👥</p>
+            <h3 className="text-xl font-semibold mt-4">
+              Nenhum cliente encontrado
+            </h3>
+            <p className="text-slate-500 mt-2">
+              Clientes aparecem aqui após realizarem pedidos.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1080px]">
+              <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <td colSpan="6" className="px-5 py-14 text-center">
-                    <p className="text-slate-500">Nenhum cliente encontrado.</p>
-                  </td>
+                  <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Cliente
+                  </th>
+                  <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Telefone
+                  </th>
+                  <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Pedidos
+                  </th>
+                  <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Pagos
+                  </th>
+                  <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Total gasto
+                  </th>
+                  <th className="text-left px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Último pedido
+                  </th>
+                  <th className="text-right px-5 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    Ações
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {customers.map((customer) => (
+                  <tr
+                    key={customer.id}
+                    className="hover:bg-slate-50/70 transition"
+                  >
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 rounded-2xl bg-slate-950 text-white flex items-center justify-center font-medium">
+                          {customer.name?.charAt(0)?.toUpperCase() || "C"}
+                        </div>
+
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            {customer.name}
+                          </p>
+                          <p className="text-sm text-slate-500">
+                            Cliente cadastrado
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-slate-600">
+                      {customer.phone}
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <Badge>{customer.orders_count || 0} pedido(s)</Badge>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <Badge tone="green">
+                        {customer.paid_orders_count || 0} pago(s)
+                      </Badge>
+                    </td>
+
+                    <td className="px-5 py-4 text-sm font-medium text-slate-900">
+                      {money(customer.total_spent)}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-slate-600">
+                      {dateTime(customer.last_order_at)}
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openHistory(customer)}
+                          className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100"
+                          title="Histórico"
+                        >
+                          🕒
+                        </button>
+
+                        <button
+                          onClick={() => openEdit(customer)}
+                          className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100"
+                          title="Editar"
+                        >
+                          ✏️
+                        </button>
+
+                        <button
+                          onClick={() => deleteCustomer(customer)}
+                          className="w-9 h-9 rounded-xl border border-red-100 text-red-600 hover:bg-red-50"
+                          title="Excluir"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <PremiumPagination
+              totalItems={pagination?.total || customers.length}
+              itemsPerPage={itemsPerPage}
+              currentPage={page}
+              onPageChange={setPage}
+            />
+          </div>
+        )}
       </section>
 
       {drawerOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex justify-end">
-          <div className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col">
+          <aside className="bg-white w-full max-w-lg h-full shadow-2xl flex flex-col">
             <div className="h-20 px-6 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-500">Edição de cliente</p>
@@ -315,13 +359,13 @@ export default function CustomersPage() {
                 {loading ? "Salvando..." : "Salvar"}
               </button>
             </div>
-          </div>
+          </aside>
         </div>
       )}
 
       {historyOpen && selectedCustomer && (
         <div className="fixed inset-0 z-50 bg-black/40 flex justify-end">
-          <div className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col">
+          <aside className="bg-white w-full max-w-2xl h-full shadow-2xl flex flex-col">
             <div className="h-20 px-6 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-500">Histórico do cliente</p>
@@ -359,6 +403,7 @@ export default function CustomersPage() {
                           <p className="font-medium">
                             Mesa {order.table_number}
                           </p>
+
                           <p className="text-sm text-slate-500">
                             {dateTime(order.created_at)}
                           </p>
@@ -395,19 +440,41 @@ export default function CustomersPage() {
                 </div>
               )}
             </div>
-          </div>
+          </aside>
         </div>
       )}
     </AdminLayout>
   );
 }
 
-function Metric({ title, value }) {
+function Metric({ title, value, tone }) {
+  const tones = {
+    green: "text-green-600",
+  };
+
   return (
     <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-5">
       <p className="text-sm text-slate-500">{title}</p>
-      <p className="text-2xl font-semibold mt-1">{value}</p>
+      <p className={`text-2xl font-semibold mt-1 ${tones[tone] || ""}`}>
+        {value}
+      </p>
     </div>
+  );
+}
+
+function Badge({ children, tone }) {
+  const tones = {
+    green: "bg-green-50 text-green-700 border-green-100",
+  };
+
+  return (
+    <span
+      className={`inline-flex px-3 py-1 rounded-full text-xs font-medium border ${
+        tones[tone] || "bg-blue-50 text-blue-700 border-blue-100"
+      }`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -417,13 +484,5 @@ function Field({ label, children }) {
       <p className="text-sm font-medium text-slate-700 mb-2">{label}</p>
       {children}
     </label>
-  );
-}
-
-function Badge({ children }) {
-  return (
-    <span className="px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
-      {children}
-    </span>
   );
 }

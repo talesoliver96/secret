@@ -165,3 +165,27 @@ exports.validatePublicTable = async (req, res) => {
     table,
   });
 };
+
+exports.deleteTable = async (req, res) => {
+  const { id } = req.params;
+
+  const { count } = await supabase
+    .from("orders")
+    .select("*", { count: "exact", head: true })
+    .eq("table_id", id);
+
+  if (count > 0) {
+    return res.status(400).json({
+      error: "Não é possível excluir mesa com pedidos vinculados. Desative a mesa.",
+    });
+  }
+
+  const { error } = await supabase
+    .from("restaurant_tables")
+    .delete()
+    .eq("id", id);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.json({ message: "Mesa excluída." });
+};
