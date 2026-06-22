@@ -64,7 +64,7 @@ export default function MenuPage() {
       }, []);
 
     return [
-      { name: "Burgers", slug: "todos", icon: "🍔" },
+      { name: "Menu", slug: "todos", icon: "🍔" },
       ...unique.map((category) => ({
         ...category,
         icon: getCategoryIcon(category),
