@@ -3,6 +3,7 @@ import AdminLayout from "../../components/AdminLayout";
 import api from "../../api/axios";
 import PremiumPagination from "../../components/PremiumPagination";
 import { formatDateTime } from "../../utils/date";
+import { printOrder } from "../../utils/printOrder";
 
 const statuses = ["recebido", "preparando", "pronto", "entregue", "cancelado"];
 
@@ -306,6 +307,14 @@ export default function OrdersPage() {
                         </button>
 
                         <button
+  onClick={() => printOrder(order)}
+  className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100"
+  title="Imprimir pedido"
+>
+  🖨️
+</button>
+
+                        <button
                           onClick={() => updateStatus(order, "preparando")}
                           disabled={order.status === "preparando"}
                           className="w-9 h-9 rounded-xl border border-blue-100 text-blue-700 hover:bg-blue-50 disabled:opacity-40"
@@ -416,21 +425,30 @@ export default function OrdersPage() {
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-100 grid grid-cols-2 md:grid-cols-5 gap-2">
-              {statuses.map((status) => (
-                <button
-                  key={status}
-                  onClick={() => updateStatus(selectedOrder, status)}
-                  className={`py-3 rounded-2xl text-sm font-medium border ${
-                    selectedOrder.status === status
-                      ? "bg-slate-950 text-white border-slate-950"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
+            <div className="p-6 border-t border-slate-100 space-y-3">
+  <button
+    onClick={() => printOrder(selectedOrder)}
+    className="w-full bg-slate-950 text-white py-3 rounded-2xl text-sm font-medium hover:bg-slate-800"
+  >
+    🖨️ Imprimir pedido
+  </button>
+
+  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+    {statuses.map((status) => (
+      <button
+        key={status}
+        onClick={() => updateStatus(selectedOrder, status)}
+        className={`py-3 rounded-2xl text-sm font-medium border ${
+          selectedOrder.status === status
+            ? "bg-slate-950 text-white border-slate-950"
+            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+        }`}
+      >
+        {status}
+      </button>
+    ))}
+  </div>
+</div>
           </aside>
         </div>
       )}
