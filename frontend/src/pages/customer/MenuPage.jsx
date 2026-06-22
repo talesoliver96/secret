@@ -250,7 +250,7 @@ export default function MenuPage() {
             </h1>
 
             <p className="text-2xl md:text-3xl text-amber-400 tracking-wide mt-5">
-              que você nunca esquece
+              que você nunca esquece!
             </p>
           </div>
         </div>
