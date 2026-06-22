@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../api/axios";
 import logo from "../../assets/logo.png";
+import heroBurger from "../../assets/hero-burger.png";
 
 export default function MenuPage() {
   const { numero, token } = useParams();
@@ -83,9 +84,8 @@ export default function MenuPage() {
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const heroImage =
-    products.find((p) => p.image_url)?.image_url ||
-    "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1400&auto=format&fit=crop";
+  const heroImage = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1400&auto=format&fit=crop";
+  // const heroImage = heroBurger
 
   function addToCart(product) {
     const exists = cart.find((item) => item.id === product.id);
@@ -328,22 +328,22 @@ export default function MenuPage() {
               {filteredProducts.map((product) => (
                 <article
                   key={product.id}
-                  className="bg-[#111] border border-white/10 rounded-[24px] overflow-hidden hover:border-amber-400/40 transition"
+                  className="bg-[#111] border border-white/10 rounded-[24px] overflow-hidden hover:border-amber-400/40 transition min-h-[160px]"
                 >
-                  <div className="grid sm:grid-cols-[220px_1fr_80px]">
-                    <div className="h-48 sm:h-full bg-zinc-900">
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-7xl">
-                          🍔
-                        </div>
-                      )}
-                    </div>
+                  <div className="grid sm:grid-cols-[180px_1fr_80px]">
+                    <div className="h-44 sm:h-40 bg-zinc-950/70 border-r border-white/10 flex items-center justify-center p-4">
+  {product.image_url ? (
+    <img
+      src={product.image_url}
+      alt={product.name}
+      className="max-w-full max-h-full object-contain drop-shadow-2xl"
+    />
+  ) : (
+    <div className="w-full h-full flex items-center justify-center text-6xl">
+      🍔
+    </div>
+  )}
+</div>
 
                     <div className="p-6">
                       <h3 className="text-2xl font-semibold">

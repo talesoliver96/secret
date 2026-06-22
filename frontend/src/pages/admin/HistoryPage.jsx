@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import api from "../../api/axios";
 import PremiumPagination from "../../components/PremiumPagination";
+import { formatDateTime } from "../../utils/date";
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -174,7 +175,7 @@ export default function HistoryPage() {
                             Mesa {order.table_number}
                           </p>
                           <p className="text-sm text-slate-500">
-                            {dateTime(order.created_at)}
+                            {formatDateTime(order.created_at)}
                           </p>
                         </div>
                       </div>
@@ -280,7 +281,7 @@ export default function HistoryPage() {
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <Info title="Cliente" value={selectedOrder.customers?.name || "-"} />
                 <Info title="Telefone" value={selectedOrder.customers?.phone || "-"} />
-                <Info title="Criado em" value={dateTime(selectedOrder.created_at)} />
+                <Info title="Criado em" value={formatDateTime(selectedOrder.created_at)} />
                 <Info title="Total" value={money(selectedOrder.total)} />
               </div>
 

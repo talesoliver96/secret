@@ -48,6 +48,32 @@ const itemsPerPage = 10;
     loadData();
   }, []);
 
+  async function uploadProductImage(file) {
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  try {
+    setLoading(true);
+
+    const { data } = await api.post("/admin/upload/product-image", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    setForm((prev) => ({
+      ...prev,
+      image_url: data.url,
+    }));
+  } catch (error) {
+    alert(error.response?.data?.error || "Erro ao enviar imagem.");
+  } finally {
+    setLoading(false);
+  }
+}
+
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const term = search.toLowerCase();
@@ -424,16 +450,44 @@ const itemsPerPage = 10;
 </Field>
                 </div>
 
-                <Field label="URL da imagem">
-                  <input
-                    value={form.image_url}
-                    onChange={(e) =>
-                      setForm({ ...form, image_url: e.target.value })
-                    }
-                    placeholder="https://..."
-                    className="admin-input"
-                  />
-                </Field>
+                <Field label="Imagem do produto">
+  <div className="border border-slate-200 rounded-3xl p-4 bg-slate-50">
+    {form.image_url ? (
+      <img
+        src={form.image_url}
+        alt="Prévia"
+        className="w-full h-56 object-cover rounded-2xl border border-slate-200 bg-white"
+      />
+    ) : (
+      <div className="w-full h-56 rounded-2xl border border-dashed border-slate-300 flex items-center justify-center text-slate-400 bg-white">
+        Nenhuma imagem selecionada
+      </div>
+    )}
+
+    <label className="mt-4 block">
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => uploadProductImage(e.target.files?.[0])}
+        className="hidden"
+      />
+
+      <span className="block text-center bg-slate-950 hover:bg-slate-800 text-white py-3 rounded-2xl font-medium cursor-pointer">
+        Selecionar imagem
+      </span>
+    </label>
+
+    {form.image_url && (
+      <button
+        type="button"
+        onClick={() => setForm({ ...form, image_url: "" })}
+        className="mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-2xl font-medium"
+      >
+        Remover imagem
+      </button>
+    )}
+  </div>
+</Field>
 
                 {form.image_url && (
                   <div className="rounded-3xl overflow-hidden border border-slate-200 bg-slate-50">

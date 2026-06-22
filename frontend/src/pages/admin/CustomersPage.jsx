@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import PremiumPagination from "../../components/PremiumPagination";
 import api from "../../api/axios";
+import { formatDateTime } from "../../utils/date";
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -255,7 +256,7 @@ export default function CustomersPage() {
                     </td>
 
                     <td className="px-5 py-4 text-sm text-slate-600">
-                      {dateTime(customer.last_order_at)}
+                      {formatDateTime(customer.last_order_at)}
                     </td>
 
                     <td className="px-5 py-4">
@@ -405,7 +406,7 @@ export default function CustomersPage() {
                           </p>
 
                           <p className="text-sm text-slate-500">
-                            {dateTime(order.created_at)}
+                            {formatDateTime(order.created_at)}
                           </p>
 
                           <div className="mt-2 flex gap-2 flex-wrap">

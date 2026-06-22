@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/AdminLayout";
 import api from "../../api/axios";
+import { formatDateTime } from "../../utils/date";
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
@@ -336,7 +337,7 @@ export default function TablesPage() {
                           {order.customers?.phone || "-"}
                         </p>
                         <p className="text-xs text-slate-400 mt-1">
-                          {dateTime(order.created_at)}
+                          {formatDateTime(order.created_at)}
                         </p>
                       </div>
 

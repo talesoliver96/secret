@@ -34,7 +34,5 @@ exports.getPublicMenu = async (req, res) => {
     return (a.display_order || 0) - (b.display_order || 0);
   });
 
-res.json(visibleProducts);
-
-  return res.json(data);
+  return res.json(visibleProducts);
 };

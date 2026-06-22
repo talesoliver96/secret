@@ -12,6 +12,7 @@ const adminRoutes = require("./routes/admin.routes");
 const settingsRoutes = require("./routes/settings.routes");
 const catalogRoutes = require("./routes/catalog.routes");
 const customersRoutes = require("./routes/customers.routes");
+const uploadRoutes = require("./routes/upload.routes");
 
 const authRoutes = require("./routes/auth.routes");
 const authMiddleware = require("./middlewares/auth.middleware");
@@ -50,6 +51,7 @@ app.use("/api", authMiddleware, adminRoutes);
 app.use("/api", authMiddleware, settingsRoutes);
 app.use("/api", authMiddleware, customersRoutes);
 app.use("/api", authMiddleware, catalogRoutes);
+app.use("/api", authMiddleware, uploadRoutes);
 
 app.use("/api", dangerRoutes);
 
