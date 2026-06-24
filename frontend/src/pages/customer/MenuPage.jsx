@@ -414,7 +414,7 @@ export default function MenuPage() {
               O hambúrguer
             </p>
 
-            <h1 className="text-6xl md:text-8xl font-semibold leading-[0.85] mt-5">
+            <h1 className="text-6xl md:text-6xl font-semibold leading-[0.85] mt-5">
               SECRETO
             </h1>
 
