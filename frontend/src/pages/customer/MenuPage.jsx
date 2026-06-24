@@ -230,7 +230,6 @@ export default function MenuPage() {
       setCart([]);
       setCartOpen(false);
       setCheckoutOpen(false);
-      setCustomer({ name: "", phone: "" });
       setNotes("");
     } catch (error) {
       alert(error.response?.data?.error || "Erro ao criar pedido.");
