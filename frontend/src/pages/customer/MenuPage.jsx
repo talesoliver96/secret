@@ -7,6 +7,7 @@ import { formatDateTime } from "../../utils/date";
 
 const CUSTOMER_CACHE_KEY = "@secretburger:customer";
 const CUSTOMER_CACHE_TTL = 3 * 60 * 60 * 1000;
+const PRODUCTS_PER_PAGE = 8;
 
 function getCachedCustomer() {
   const raw = localStorage.getItem(CUSTOMER_CACHE_KEY);
@@ -37,16 +38,22 @@ function saveCachedCustomer(customer) {
   );
 }
 
+function formatMoney(value) {
+  return `R$ ${Number(value || 0).toFixed(2)}`;
+}
+
 export default function MenuPage() {
   const { numero, token } = useParams();
 
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState("todos");
   const [cart, setCart] = useState([]);
+
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [customer, setCustomer] = useState({ name: "", phone: "" });
   const [notes, setNotes] = useState("");
+
   const [tableValid, setTableValid] = useState(false);
   const [tableError, setTableError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,6 +62,8 @@ export default function MenuPage() {
   const [customerReady, setCustomerReady] = useState(false);
   const [myOrdersOpen, setMyOrdersOpen] = useState(false);
   const [myOrders, setMyOrders] = useState([]);
+  const [visibleProducts, setVisibleProducts] = useState(PRODUCTS_PER_PAGE);
+  const [visibleFinishedOrders, setVisibleFinishedOrders] = useState(5);
 
   async function loadMenu() {
     const { data } = await api.get("/menu");
@@ -73,6 +82,7 @@ export default function MenuPage() {
       );
 
       setMyOrders(data || []);
+      setVisibleFinishedOrders(5);
       setMyOrdersOpen(true);
     } catch (err) {
       console.error(err);
@@ -93,7 +103,7 @@ export default function MenuPage() {
           setCustomerReady(true);
         }
 
-        loadMenu();
+        await loadMenu();
       } catch (error) {
         setTableError(
           error.response?.data?.error ||
@@ -105,22 +115,35 @@ export default function MenuPage() {
     init();
   }, [numero, token]);
 
+  useEffect(() => {
+    setVisibleProducts(PRODUCTS_PER_PAGE);
+  }, [activeCategory]);
+
   const categories = useMemo(() => {
     const unique = products
-      .map((p) => p.category)
+      .map((product) => product.category)
       .filter(Boolean)
-      .reduce((acc, cat) => {
-        if (!acc.find((item) => item.slug === cat.slug)) acc.push(cat);
+      .reduce((acc, category) => {
+        if (!acc.some((item) => item.slug === category.slug)) {
+          acc.push(category);
+        }
+
         return acc;
       }, []);
 
     return [{ name: "Todos", slug: "todos" }, ...unique];
   }, [products]);
 
-  const filteredProducts =
-    activeCategory === "todos"
-      ? products
-      : products.filter((p) => p.category?.slug === activeCategory);
+  const filteredProducts = useMemo(() => {
+    if (activeCategory === "todos") return products;
+
+    return products.filter(
+      (product) => product.category?.slug === activeCategory
+    );
+  }, [products, activeCategory]);
+
+  const productsToShow = filteredProducts.slice(0, visibleProducts);
+  const hasMoreProducts = visibleProducts < filteredProducts.length;
 
   const total = cart.reduce(
     (sum, item) => sum + Number(item.price) * item.quantity,
@@ -128,8 +151,6 @@ export default function MenuPage() {
   );
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  const heroImage = heroBurger;
 
   const activeMyOrders = myOrders.filter((order) =>
     ["recebido", "preparando", "pronto"].includes(order.status)
@@ -139,20 +160,24 @@ export default function MenuPage() {
     ["entregue", "cancelado"].includes(order.status)
   );
 
-  function addToCart(product) {
-    const exists = cart.find((item) => item.id === product.id);
+  const finishedOrdersToShow = finishedMyOrders.slice(0, visibleFinishedOrders);
 
-    if (exists) {
-      setCart(
-        cart.map((item) =>
+  const hasMoreFinishedOrders = visibleFinishedOrders < finishedMyOrders.length;
+
+  function addToCart(product) {
+    setCart((currentCart) => {
+      const exists = currentCart.find((item) => item.id === product.id);
+
+      if (exists) {
+        return currentCart.map((item) =>
           item.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
             : item
-        )
-      );
-    } else {
-      setCart([
-        ...cart,
+        );
+      }
+
+      return [
+        ...currentCart,
         {
           id: product.id,
           name: product.name,
@@ -160,15 +185,15 @@ export default function MenuPage() {
           image_url: product.image_url,
           quantity: 1,
         },
-      ]);
-    }
+      ];
+    });
 
     setCartOpen(true);
   }
 
   function decreaseItem(id) {
-    setCart(
-      cart
+    setCart((currentCart) =>
+      currentCart
         .map((item) =>
           item.id === id ? { ...item, quantity: item.quantity - 1 } : item
         )
@@ -177,20 +202,25 @@ export default function MenuPage() {
   }
 
   function increaseItem(id) {
-    setCart(
-      cart.map((item) =>
+    setCart((currentCart) =>
+      currentCart.map((item) =>
         item.id === id ? { ...item, quantity: item.quantity + 1 } : item
       )
     );
   }
 
   function removeItem(id) {
-    setCart(cart.filter((item) => item.id !== id));
+    setCart((currentCart) => currentCart.filter((item) => item.id !== id));
   }
 
   async function submitOrder() {
     if (!customer.name.trim() || !customer.phone.trim()) {
       alert("Informe seu nome e telefone.");
+      return;
+    }
+
+    if (cart.length === 0) {
+      alert("Seu carrinho está vazio.");
       return;
     }
 
@@ -224,8 +254,8 @@ export default function MenuPage() {
 
   if (tableError) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-6">
-        <section className="text-center max-w-md">
+      <main className="min-h-screen bg-[#080808] text-white flex items-center justify-center px-6">
+        <section className="text-center max-w-md bg-white/[0.04] border border-white/10 rounded-[32px] p-8">
           <div className="text-6xl">🔒</div>
           <h1 className="text-3xl font-semibold mt-6">Acesso indisponível</h1>
           <p className="text-zinc-400 mt-3">{tableError}</p>
@@ -236,8 +266,8 @@ export default function MenuPage() {
 
   if (!tableValid) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
-        <p className="text-amber-400 tracking-[0.3em] uppercase">
+      <main className="min-h-screen bg-[#080808] text-white flex items-center justify-center">
+        <p className="text-amber-400 tracking-[0.3em] uppercase text-sm">
           Carregando cardápio...
         </p>
       </main>
@@ -246,9 +276,9 @@ export default function MenuPage() {
 
   if (successOrder) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-5">
-        <section className="max-w-md w-full text-center">
-          <div className="w-24 h-24 rounded-full bg-amber-400 text-black flex items-center justify-center text-5xl mx-auto">
+      <main className="min-h-screen bg-[#080808] text-white flex items-center justify-center px-5">
+        <section className="max-w-md w-full text-center bg-white/[0.04] border border-white/10 rounded-[36px] p-8">
+          <div className="w-24 h-24 rounded-full bg-amber-400 text-black flex items-center justify-center text-5xl mx-auto shadow-[0_0_80px_rgba(251,191,36,.35)]">
             ✓
           </div>
 
@@ -258,10 +288,10 @@ export default function MenuPage() {
             Seu pedido foi enviado para a cozinha.
           </p>
 
-          <div className="mt-6 grid grid-cols-1 gap-3">
+          <div className="mt-7 grid gap-3">
             <button
               onClick={() => setSuccessOrder(null)}
-              className="w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
+              className="w-full bg-amber-400 text-black py-4 rounded-full font-semibold hover:bg-amber-300 transition"
             >
               Fazer outro pedido
             </button>
@@ -271,7 +301,7 @@ export default function MenuPage() {
                 setSuccessOrder(null);
                 loadMyOrders();
               }}
-              className="w-full border border-white/10 text-white py-4 rounded-full font-semibold"
+              className="w-full border border-white/10 text-white py-4 rounded-full font-semibold hover:border-amber-400/50 transition"
             >
               Ver meus pedidos
             </button>
@@ -283,9 +313,13 @@ export default function MenuPage() {
 
   if (!customerReady) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-5">
-        <section className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] p-6">
-          <img src={logo} alt="The Secret Burger" className="h-20 object-contain" />
+      <main className="min-h-screen bg-[#080808] text-white flex items-center justify-center px-5">
+        <section className="w-full max-w-md bg-[#111] border border-white/10 rounded-[36px] p-6 shadow-2xl">
+          <img
+            src={logo}
+            alt="The Secret Burger"
+            className="h-20 object-contain"
+          />
 
           <h1 className="text-3xl font-semibold mt-8">Antes de pedir</h1>
 
@@ -300,7 +334,7 @@ export default function MenuPage() {
                 setCustomer({ ...customer, name: e.target.value })
               }
               placeholder="Seu nome"
-              className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
+              className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none focus:border-amber-400/60 transition"
             />
 
             <input
@@ -309,7 +343,7 @@ export default function MenuPage() {
                 setCustomer({ ...customer, phone: e.target.value })
               }
               placeholder="Telefone"
-              className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
+              className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none focus:border-amber-400/60 transition"
             />
           </div>
 
@@ -323,7 +357,7 @@ export default function MenuPage() {
               saveCachedCustomer(customer);
               setCustomerReady(true);
             }}
-            className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
+            className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold hover:bg-amber-300 transition"
           >
             Entrar no cardápio
           </button>
@@ -333,18 +367,18 @@ export default function MenuPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white pb-28">
-      <section className="relative min-h-[420px] overflow-hidden">
+    <main className="min-h-screen bg-[#f5f5f5] text-black pb-28">
+      <section className="relative min-h-[460px] overflow-hidden text-white">
         <div className="absolute inset-0 bg-black" />
 
         <img
-          src={heroImage}
+          src={heroBurger}
           alt="Burger"
-          className="absolute inset-0 w-full h-full object-cover opacity-80"
+          className="absolute inset-0 w-full h-full object-cover opacity-75"
         />
 
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/20" />
 
         <div className="relative max-w-7xl mx-auto px-5 py-7">
           <header className="flex items-center justify-between gap-4">
@@ -363,16 +397,20 @@ export default function MenuPage() {
               </div>
 
               <div className="hidden sm:block text-left leading-tight">
-                <p className="text-sm font-medium max-w-32 truncate">
+                <p className="text-sm font-semibold max-w-32 truncate">
                   {customer.name}
                 </p>
-                <p className="text-xs text-zinc-400">🔒 Meus pedidos</p>
+                <p className="text-xs text-zinc-400">Meus pedidos</p>
               </div>
             </button>
           </header>
 
-          <div className="mt-16 max-w-xl">
-            <p className="text-amber-400 tracking-[0.5em] uppercase text-xs">
+          <div className="mt-14 max-w-xl">
+            <p className="text-amber-400 tracking-[0.45em] uppercase text-xs">
+              Mesa {numero} • Cardápio digital
+            </p>
+
+            <p className="text-amber-400 tracking-[0.45em] uppercase text-xs mt-6">
               O hambúrguer
             </p>
 
@@ -383,11 +421,16 @@ export default function MenuPage() {
             <p className="text-2xl md:text-3xl text-amber-400 tracking-wide mt-5">
               que você nunca esquece!
             </p>
+
+            <p className="text-zinc-300 mt-5 max-w-md leading-relaxed">
+              Hambúrguer artesanal, ingredientes selecionados e uma experiência
+              feita para pedir sem complicação.
+            </p>
           </div>
         </div>
       </section>
 
-      <nav className="sticky top-0 z-30 bg-neutral-950/95 backdrop-blur-2xl border-b border-white/10">
+      <nav className="sticky top-0 z-30 bg-white/95 backdrop-blur-2xl border-b border-zinc-200">
         <div className="max-w-7xl mx-auto px-5">
           <div className="h-20 flex items-center gap-3 overflow-x-auto scrollbar-hide">
             {categories.map((category) => {
@@ -397,10 +440,10 @@ export default function MenuPage() {
                 <button
                   key={category.slug}
                   onClick={() => setActiveCategory(category.slug)}
-                  className={`shrink-0 px-5 py-3 rounded-full text-sm font-medium border transition ${
+                  className={`shrink-0 px-5 py-3 rounded-full text-sm font-semibold border transition ${
                     active
-                      ? "bg-white text-black border-white"
-                      : "bg-white/[0.04] text-zinc-300 border-white/10 hover:bg-white/[0.08]"
+                      ? "bg-amber-400 text-black border-amber-400 shadow-[0_10px_30px_rgba(251,191,36,.25)]"
+                      : "bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50"
                   }`}
                 >
                   {category.name}
@@ -411,84 +454,73 @@ export default function MenuPage() {
         </div>
       </nav>
 
-      <section id="menu" className="max-w-7xl mx-auto px-5 py-8">
-        <div className="grid lg:grid-cols-[1fr_380px] gap-8 items-start">
-          <div>
-            <p className="text-amber-400 uppercase tracking-[0.3em] text-xs">
-              {activeCategory === "todos"
-                ? "Cardápio"
-                : categories.find((c) => c.slug === activeCategory)?.name}
-            </p>
+      <section id="menu" className="bg-[#f5f5f5] text-black">
+        <div className="max-w-7xl mx-auto px-5 py-10">
+          <div className="grid lg:grid-cols-[1fr_390px] gap-8 items-start">
+            <div>
+              <p className="text-amber-500 uppercase tracking-[0.3em] text-xs font-bold">
+                {activeCategory === "todos"
+                  ? "Cardápio"
+                  : categories.find((c) => c.slug === activeCategory)?.name}
+              </p>
 
-            <h2 className="text-3xl md:text-4xl font-semibold mt-2">
-              Escolha seu pedido
-            </h2>
+              <div className="mt-2">
+                <h2 className="text-3xl md:text-4xl font-bold">
+                  Escolha seu pedido
+                </h2>
 
-            <div className="mt-7 grid grid-cols-2 md:grid-cols-3 gap-4">
-              {filteredProducts.map((product) => (
-                <article
-  key={product.id}
-  className="group bg-[#141414] border border-white/10 rounded-[24px] overflow-hidden hover:border-amber-400/40 hover:bg-[#181818] transition shadow-[0_20px_60px_rgba(0,0,0,.25)]"
->
-  <div className="aspect-square bg-[#1d1d1d] flex items-center justify-center overflow-hidden">
-    {product.image_url ? (
-      <img
-        src={product.image_url}
-        alt={product.name}
-        className="w-full h-full object-contain p-4 group-hover:scale-105 transition duration-300"
-      />
-    ) : (
-      <div className="text-6xl">🍔</div>
-    )}
-  </div>
+                <p className="text-zinc-500 mt-2">
+                  {filteredProducts.length} produto(s) disponível(is)
+                </p>
+              </div>
 
-  <div className="p-4">
-    <p className="text-amber-400 text-lg font-bold">
-      R$ {Number(product.price).toFixed(2)}
-    </p>
+              <div className="mt-7 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {productsToShow.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onAdd={addToCart}
+                  />
+                ))}
+              </div>
 
-    <h3 className="mt-2 text-white text-base md:text-lg font-semibold leading-tight line-clamp-2">
-      {product.name}
-    </h3>
-
-    <p className="mt-2 text-sm text-zinc-400 line-clamp-2 min-h-10">
-      {product.description}
-    </p>
-
-    <button
-      onClick={() => addToCart(product)}
-      className="mt-4 w-full bg-amber-400 text-black py-3 rounded-2xl font-semibold hover:bg-amber-300 transition"
-    >
-      Adicionar
-    </button>
-  </div>
-</article>
-              ))}
+              {hasMoreProducts && (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={() =>
+                      setVisibleProducts((prev) => prev + PRODUCTS_PER_PAGE)
+                    }
+                    className="px-8 py-4 rounded-full border border-zinc-300 bg-white text-black font-semibold hover:border-amber-400 hover:bg-amber-50 transition"
+                  >
+                    Ver mais produtos
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
 
-          <aside className="hidden lg:block sticky top-28 bg-[#141414] text-white border border-white/10 rounded-[28px] p-5 shadow-[0_20px_60px_rgba(0,0,0,.35)]">
-            <CartContent
-              cart={cart}
-              total={total}
-              increaseItem={increaseItem}
-              decreaseItem={decreaseItem}
-              removeItem={removeItem}
-              onCheckout={() => setCheckoutOpen(true)}
-            />
-          </aside>
+            <aside className="hidden lg:block sticky top-28 bg-white text-black border border-zinc-200 rounded-[32px] p-5 shadow-[0_20px_80px_rgba(0,0,0,.08)]">
+              <CartContent
+                cart={cart}
+                total={total}
+                increaseItem={increaseItem}
+                decreaseItem={decreaseItem}
+                removeItem={removeItem}
+                onCheckout={() => setCheckoutOpen(true)}
+              />
+            </aside>
+          </div>
         </div>
       </section>
 
       {cart.length > 0 && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed bottom-5 left-5 right-5 md:left-1/2 md:-translate-x-1/2 md:w-[520px] z-40 bg-neutral-950 border border-white/15 rounded-full px-5 py-4 flex items-center justify-between shadow-2xl"
+          className="fixed bottom-5 left-5 right-5 md:left-1/2 md:-translate-x-1/2 md:w-[520px] z-40 bg-neutral-950 text-white border border-white/15 rounded-full px-5 py-4 flex items-center justify-between shadow-2xl hover:border-amber-400/50 transition"
         >
           <span className="flex items-center gap-3">
             <span className="relative text-2xl">
               🛒
-              <span className="absolute -top-2 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
+              <span className="absolute -top-2 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
                 {totalItems}
               </span>
             </span>
@@ -496,40 +528,27 @@ export default function MenuPage() {
             <strong>{totalItems} item(ns)</strong>
           </span>
 
-          <strong className="text-amber-400">R$ {total.toFixed(2)}</strong>
+          <strong className="text-amber-400">{formatMoney(total)}</strong>
         </button>
       )}
 
       {cartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
-          <aside className="w-full max-w-lg bg-white text-black h-full p-6 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-semibold">Meu pedido</h3>
-
-              <button
-                onClick={() => setCartOpen(false)}
-                className="w-10 h-10 rounded-full bg-zinc-100 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-
-            <CartContent
-              cart={cart}
-              total={total}
-              increaseItem={increaseItem}
-              decreaseItem={decreaseItem}
-              removeItem={removeItem}
-              onCheckout={() => setCheckoutOpen(true)}
-            />
-          </aside>
-        </div>
+        <Drawer onClose={() => setCartOpen(false)} title="Meu pedido">
+          <CartContent
+            cart={cart}
+            total={total}
+            increaseItem={increaseItem}
+            decreaseItem={decreaseItem}
+            removeItem={removeItem}
+            onCheckout={() => setCheckoutOpen(true)}
+          />
+        </Drawer>
       )}
 
       {checkoutOpen && (
         <div className="fixed inset-0 z-[60] bg-black/80 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white text-black rounded-[32px] w-full max-w-md p-6">
-            <div className="flex justify-between">
+          <div className="bg-white text-black rounded-[32px] w-full max-w-md p-6 shadow-2xl">
+            <div className="flex justify-between items-center">
               <h3 className="text-2xl font-semibold">Finalizar pedido</h3>
 
               <button
@@ -547,7 +566,7 @@ export default function MenuPage() {
                   setCustomer({ ...customer, name: e.target.value })
                 }
                 placeholder="Seu nome"
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none"
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none focus:border-amber-400 transition"
               />
 
               <input
@@ -556,62 +575,128 @@ export default function MenuPage() {
                   setCustomer({ ...customer, phone: e.target.value })
                 }
                 placeholder="Telefone"
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none"
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none focus:border-amber-400 transition"
               />
 
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Observações"
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none min-h-24"
+                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none min-h-24 focus:border-amber-400 transition"
               />
             </div>
 
             <button
               onClick={submitOrder}
               disabled={loading}
-              className="mt-6 w-full bg-neutral-950 text-white py-4 rounded-full font-semibold disabled:opacity-50"
+              className="mt-6 w-full bg-neutral-950 text-white py-4 rounded-full font-semibold disabled:opacity-50 hover:bg-black transition"
             >
               {loading
                 ? "Enviando..."
-                : `Enviar pedido • R$ ${total.toFixed(2)}`}
+                : `Enviar pedido • ${formatMoney(total)}`}
             </button>
           </div>
         </div>
       )}
 
       {myOrdersOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
-          <aside className="w-full max-w-lg bg-white text-black h-full p-6 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <p className="text-zinc-500 text-sm">{customer.name}</p>
-                <h3 className="text-2xl font-semibold">Meus pedidos</h3>
-              </div>
+        <Drawer onClose={() => setMyOrdersOpen(false)} title="Meus pedidos">
+          <div className="mb-6">
+            <p className="text-zinc-500 text-sm">{customer.name}</p>
+          </div>
 
-              <button
-                onClick={() => setMyOrdersOpen(false)}
-                className="w-10 h-10 rounded-full bg-zinc-100 text-2xl"
-              >
-                ×
-              </button>
+          {myOrders.length === 0 ? (
+            <div className="border border-zinc-200 rounded-3xl p-6 text-center">
+              <p className="text-4xl">🧾</p>
+              <p className="text-zinc-500 mt-3">Nenhum pedido encontrado.</p>
             </div>
+          ) : (
+            <div className="space-y-8">
+              <OrderGroup title="Em andamento" orders={activeMyOrders} />
+              <div className="space-y-4">
+                <OrderGroup
+                  title="Finalizados"
+                  orders={finishedMyOrders.slice(0, visibleFinishedOrders)}
+                />
 
-            {myOrders.length === 0 ? (
-              <div className="border border-zinc-200 rounded-3xl p-6 text-center">
-                <p className="text-4xl">🧾</p>
-                <p className="text-zinc-500 mt-3">Nenhum pedido encontrado.</p>
+                {hasMoreFinishedOrders && (
+                  <button
+                    onClick={() =>
+                      setVisibleFinishedOrders((prev) => prev + 5)
+                    }
+                    className="w-full py-4 rounded-2xl border border-zinc-200 bg-white text-zinc-700 font-semibold hover:bg-zinc-50 transition"
+                  >
+                    Ver mais pedidos finalizados
+                  </button>
+                )}
               </div>
-            ) : (
-              <div className="space-y-8">
-                <OrderGroup title="Em andamento" orders={activeMyOrders} />
-                <OrderGroup title="Finalizados" orders={finishedMyOrders} />
-              </div>
-            )}
-          </aside>
-        </div>
+            </div>
+          )}
+        </Drawer>
       )}
     </main>
+  );
+}
+
+function ProductCard({ product, onAdd }) {
+  return (
+    <article className="group bg-white text-black rounded-[22px] overflow-hidden border border-zinc-200 hover:border-zinc-300 hover:shadow-[0_18px_50px_rgba(0,0,0,.10)] transition">
+      <div className="flex gap-4 p-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-bold leading-tight line-clamp-2">
+            {product.name}
+          </h3>
+
+          <p className="mt-2 text-sm text-zinc-500 line-clamp-2 min-h-10">
+            {product.description || "Produto artesanal da casa."}
+          </p>
+
+          <p className="mt-4 text-xl font-extrabold text-black">
+            {formatMoney(product.price)}
+          </p>
+
+          <button
+            onClick={() => onAdd(product)}
+            className="mt-4 bg-amber-400 text-black px-5 py-2.5 rounded-full text-sm font-bold hover:bg-amber-300 active:scale-[0.98] transition"
+          >
+            Adicionar
+          </button>
+        </div>
+
+        <div className="w-32 h-32 md:w-36 md:h-36 rounded-[18px] bg-zinc-50 flex items-center justify-center overflow-hidden shrink-0">
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-300"
+            />
+          ) : (
+            <div className="text-5xl">🍔</div>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Drawer({ title, children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
+      <aside className="w-full max-w-lg bg-white text-black h-full p-6 overflow-y-auto shadow-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-semibold">{title}</h3>
+
+          <button
+            onClick={onClose}
+            className="w-10 h-10 rounded-full bg-zinc-100 text-2xl"
+          >
+            ×
+          </button>
+        </div>
+
+        {children}
+      </aside>
+    </div>
   );
 }
 
@@ -634,8 +719,11 @@ function CartContent({
       ) : (
         <div className="mt-6 space-y-5">
           {cart.map((item) => (
-            <div key={item.id} className="flex gap-4 border-b border-white/10 pb-5">
-              <div className="w-20 h-20 rounded-2xl bg-[#1d1d1d] overflow-hidden shrink-0">
+            <div
+              key={item.id}
+              className="flex gap-4 border-b border-zinc-200 pb-5"
+            >
+              <div className="w-20 h-20 rounded-2xl bg-zinc-100 overflow-hidden shrink-0">
                 {item.image_url ? (
                   <img
                     src={item.image_url}
@@ -651,7 +739,7 @@ function CartContent({
 
               <div className="flex-1">
                 <div className="flex justify-between gap-3">
-                  <p className="font-semibold">{item.name}</p>
+                  <p className="font-semibold leading-tight">{item.name}</p>
 
                   <button
                     onClick={() => removeItem(item.id)}
@@ -661,12 +749,12 @@ function CartContent({
                   </button>
                 </div>
 
-                <p className="text-zinc-500 text-sm">
-                  1x R$ {Number(item.price).toFixed(2)}
+                <p className="text-zinc-500 text-sm mt-1">
+                  1x {formatMoney(item.price)}
                 </p>
 
                 <div className="mt-3 flex justify-between items-center">
-                  <div className="flex border border-zinc-200 rounded-xl overflow-hidden">
+                  <div className="flex border border-zinc-200 rounded-xl overflow-hidden bg-white text-black">
                     <button
                       onClick={() => decreaseItem(item.id)}
                       className="w-8 h-8 bg-zinc-50"
@@ -686,8 +774,8 @@ function CartContent({
                     </button>
                   </div>
 
-                  <p className="text-amber-400 font-semibold">
-                    R$ {(Number(item.price) * item.quantity).toFixed(2)}
+                  <p className="text-amber-500 font-semibold">
+                    {formatMoney(Number(item.price) * item.quantity)}
                   </p>
                 </div>
               </div>
@@ -697,19 +785,17 @@ function CartContent({
           <div className="pt-4">
             <div className="flex justify-between text-zinc-500">
               <span>Subtotal</span>
-              <span>R$ {total.toFixed(2)}</span>
+              <span>{formatMoney(total)}</span>
             </div>
 
             <div className="flex justify-between text-xl mt-4">
               <strong>Total</strong>
-              <strong className="text-amber-400">
-                R$ {total.toFixed(2)}
-              </strong>
+              <strong className="text-amber-500">{formatMoney(total)}</strong>
             </div>
 
             <button
               onClick={onCheckout}
-              className="mt-6 w-full bg-neutral-950 text-white py-4 rounded-full font-semibold"
+              className="mt-6 w-full bg-neutral-950 text-white py-4 rounded-full font-semibold hover:bg-black transition"
             >
               Finalizar pedido
             </button>
@@ -758,8 +844,8 @@ function OrderGroup({ title, orders }) {
                 <StatusPill status={order.status} />
               </div>
 
-              <p className="text-amber-400 font-semibold">
-                R$ {Number(order.total).toFixed(2)}
+              <p className="text-amber-500 font-semibold">
+                {formatMoney(order.total)}
               </p>
             </div>
 
@@ -773,7 +859,7 @@ function OrderGroup({ title, orders }) {
                     {item.quantity}x {item.product_name}
                   </span>
 
-                  <span>R$ {Number(item.subtotal).toFixed(2)}</span>
+                  <span>{formatMoney(item.subtotal)}</span>
                 </div>
               ))}
             </div>
