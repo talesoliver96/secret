@@ -10,6 +10,7 @@ const CUSTOMER_CACHE_TTL = 3 * 60 * 60 * 1000;
 
 function getCachedCustomer() {
   const raw = localStorage.getItem(CUSTOMER_CACHE_KEY);
+
   if (!raw) return null;
 
   try {
@@ -72,6 +73,8 @@ export default function MenuPage() {
         `/public/my-orders?phone=${encodeURIComponent(customer.phone)}`
       );
 
+      console.log(data);
+
       setMyOrders(data || []);
       setMyOrdersOpen(true);
     } catch (err) {
@@ -105,6 +108,19 @@ export default function MenuPage() {
     init();
   }, [numero, token]);
 
+  function getCategoryIcon(category) {
+    const slug = category?.slug?.toLowerCase() || "";
+    const name = category?.name?.toLowerCase() || "";
+
+    if (slug === "todos") return "🍔";
+    if (slug.includes("bebida") || name.includes("bebida")) return "🥤";
+    if (slug.includes("sobremesa") || name.includes("sobremesa")) return "🍰";
+    if (slug.includes("combo") || name.includes("combo")) return "✦";
+    if (slug.includes("burger") || name.includes("burger")) return "🍔";
+
+    return "◌";
+  }
+
   const categories = useMemo(() => {
     const unique = products
       .map((p) => p.category)
@@ -114,7 +130,13 @@ export default function MenuPage() {
         return acc;
       }, []);
 
-    return [{ name: "Todos", slug: "todos" }, ...unique];
+    return [
+      { name: "Menu", slug: "todos", icon: "🍔" },
+      ...unique.map((category) => ({
+        ...category,
+        icon: getCategoryIcon(category),
+      })),
+    ];
   }, [products]);
 
   const filteredProducts =
@@ -129,15 +151,8 @@ export default function MenuPage() {
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const heroImage = heroBurger;
-
-  const activeMyOrders = myOrders.filter((order) =>
-    ["recebido", "preparando", "pronto"].includes(order.status)
-  );
-
-  const finishedMyOrders = myOrders.filter((order) =>
-    ["entregue", "cancelado"].includes(order.status)
-  );
+  const heroImage = "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=1400&auto=format&fit=crop";
+  // const heroImage = heroBurger
 
   function addToCart(product) {
     const exists = cart.find((item) => item.id === product.id);
@@ -196,6 +211,7 @@ export default function MenuPage() {
 
     try {
       setLoading(true);
+
       saveCachedCustomer(customer);
 
       const { data } = await api.post("/orders", {
@@ -224,7 +240,7 @@ export default function MenuPage() {
 
   if (tableError) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-6">
+      <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
         <section className="text-center max-w-md">
           <div className="text-6xl">🔒</div>
           <h1 className="text-3xl font-semibold mt-6">Acesso indisponível</h1>
@@ -236,7 +252,7 @@ export default function MenuPage() {
 
   if (!tableValid) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+      <main className="min-h-screen bg-black text-white flex items-center justify-center">
         <p className="text-amber-400 tracking-[0.3em] uppercase">
           Carregando cardápio...
         </p>
@@ -246,7 +262,7 @@ export default function MenuPage() {
 
   if (successOrder) {
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-5">
+      <main className="min-h-screen bg-black text-white flex items-center justify-center px-5">
         <section className="max-w-md w-full text-center">
           <div className="w-24 h-24 rounded-full bg-amber-400 text-black flex items-center justify-center text-5xl mx-auto">
             ✓
@@ -258,125 +274,103 @@ export default function MenuPage() {
             Seu pedido foi enviado para a cozinha.
           </p>
 
-          <div className="mt-6 grid grid-cols-1 gap-3">
-            <button
-              onClick={() => setSuccessOrder(null)}
-              className="w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
-            >
-              Fazer outro pedido
-            </button>
-
-            <button
-              onClick={() => {
-                setSuccessOrder(null);
-                loadMyOrders();
-              }}
-              className="w-full border border-white/10 text-white py-4 rounded-full font-semibold"
-            >
-              Ver meus pedidos
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (!customerReady) {
-    return (
-      <main className="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-5">
-        <section className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] p-6">
-          <img src={logo} alt="The Secret Burger" className="h-20 object-contain" />
-
-          <h1 className="text-3xl font-semibold mt-8">Antes de pedir</h1>
-
-          <p className="text-zinc-400 mt-3">
-            Informe seu nome e telefone para acompanhar seus pedidos nesta mesa.
-          </p>
-
-          <div className="mt-6 space-y-3">
-            <input
-              value={customer.name}
-              onChange={(e) =>
-                setCustomer({ ...customer, name: e.target.value })
-              }
-              placeholder="Seu nome"
-              className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
-            />
-
-            <input
-              value={customer.phone}
-              onChange={(e) =>
-                setCustomer({ ...customer, phone: e.target.value })
-              }
-              placeholder="Telefone"
-              className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
-            />
-          </div>
-
           <button
-            onClick={() => {
-              if (!customer.name.trim() || !customer.phone.trim()) {
-                alert("Informe nome e telefone.");
-                return;
-              }
-
-              saveCachedCustomer(customer);
-              setCustomerReady(true);
-            }}
-            className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
+            onClick={() => setSuccessOrder(null)}
+            className="mt-8 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
           >
-            Entrar no cardápio
+            Fazer outro pedido
           </button>
         </section>
       </main>
     );
   }
 
+  if (!customerReady) {
   return (
-    <main className="min-h-screen bg-neutral-950 text-white pb-28">
-      <section className="relative min-h-[420px] overflow-hidden">
+    <main className="min-h-screen bg-black text-white flex items-center justify-center px-5">
+      <section className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] p-6">
+        <h1 className="text-3xl font-semibold">Antes de pedir</h1>
+
+        <p className="text-zinc-400 mt-3">
+          Informe seu nome e telefone para acompanhar seus pedidos nesta mesa.
+        </p>
+
+        <div className="mt-6 space-y-3">
+          <input
+            value={customer.name}
+            onChange={(e) =>
+              setCustomer({ ...customer, name: e.target.value })
+            }
+            placeholder="Seu nome"
+            className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
+          />
+
+          <input
+            value={customer.phone}
+            onChange={(e) =>
+              setCustomer({ ...customer, phone: e.target.value })
+            }
+            placeholder="Telefone"
+            className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
+          />
+        </div>
+
+        <button
+          onClick={() => {
+            if (!customer.name.trim() || !customer.phone.trim()) {
+              alert("Informe nome e telefone.");
+              return;
+            }
+
+            saveCachedCustomer(customer);
+            setCustomerReady(true);
+          }}
+          className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
+        >
+          Entrar no cardápio
+        </button>
+      </section>
+    </main>
+  );
+}
+
+const activeMyOrders = myOrders.filter((order) =>
+  ["recebido", "preparando", "pronto"].includes(order.status)
+);
+
+const finishedMyOrders = myOrders.filter((order) =>
+  ["entregue", "cancelado"].includes(order.status)
+);
+
+  return (
+    <main className="min-h-screen bg-black text-white pb-28">
+      <section className="relative min-h-[560px] overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-black" />
 
         <img
           src={heroImage}
           alt="Burger"
-          className="absolute inset-0 w-full h-full object-cover opacity-80"
+          className="absolute right-[-160px] md:right-0 top-0 h-full w-[85%] object-cover opacity-95"
         />
 
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-transparent to-black/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30" />
 
-        <div className="relative max-w-7xl mx-auto px-5 py-7">
-          <header className="flex items-center justify-between gap-4">
+        <div className="relative max-w-7xl mx-auto px-5 py-8">
+          <header>
             <img
               src={logo}
               alt="The Secret Burger"
-              className="h-20 md:h-24 w-auto object-contain"
+              className="h-24 md:h-28 w-auto object-contain"
             />
-
-            <button
-              onClick={loadMyOrders}
-              className="flex items-center gap-3 bg-black/45 backdrop-blur-xl border border-white/10 rounded-full px-3 py-2 hover:border-amber-400/50 transition"
-            >
-              <div className="w-9 h-9 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold">
-                {customer.name?.charAt(0)?.toUpperCase() || "C"}
-              </div>
-
-              <div className="hidden sm:block text-left leading-tight">
-                <p className="text-sm font-medium max-w-32 truncate">
-                  {customer.name}
-                </p>
-                <p className="text-xs text-zinc-400">🔒 Meus pedidos</p>
-              </div>
-            </button>
           </header>
 
-          <div className="mt-16 max-w-xl">
-            <p className="text-amber-400 tracking-[0.5em] uppercase text-xs">
+          <div className="mt-24 max-w-xl">
+            <p className="text-amber-400 tracking-[0.55em] uppercase text-sm">
               O hambúrguer
             </p>
 
-            <h1 className="text-6xl md:text-8xl font-semibold leading-[0.85] mt-5">
+            <h1 className="text-7xl md:text-8xl font-semibold leading-[0.85] mt-5">
               SECRETO
             </h1>
 
@@ -387,87 +381,131 @@ export default function MenuPage() {
         </div>
       </section>
 
-      <nav className="sticky top-0 z-30 bg-neutral-950/95 backdrop-blur-2xl border-b border-white/10">
+      <nav className="sticky top-0 z-30 bg-black/90 backdrop-blur-2xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-5">
-          <div className="h-20 flex items-center gap-3 overflow-x-auto scrollbar-hide">
-            {categories.map((category) => {
-              const active = activeCategory === category.slug;
+          <div className="h-28 flex items-center gap-4 overflow-x-auto scrollbar-hide">
+            <div className="hidden md:block mr-8 shrink-0 leading-none">
+              <p className="text-sm font-semibold text-white">THE SECRET</p>
+              <p className="text-sm font-semibold text-amber-400">BURGER.</p>
+            </div>
+                                        <button
+  onClick={loadMyOrders}
+  className="border border-white/15 rounded-full px-5 py-3 text-sm bg-black/30 backdrop-blur-xl"
+>
+  Meus pedidos
+</button>
 
-              return (
-                <button
-                  key={category.slug}
-                  onClick={() => setActiveCategory(category.slug)}
-                  className={`shrink-0 px-5 py-3 rounded-full text-sm font-medium border transition ${
-                    active
-                      ? "bg-white text-black border-white"
-                      : "bg-white/[0.04] text-zinc-300 border-white/10 hover:bg-white/[0.08]"
-                  }`}
-                >
-                  {category.name}
-                </button>
-              );
-            })}
+            <div className="flex items-center gap-3">
+              {categories.map((category) => {
+                const active = activeCategory === category.slug;
+
+                return (
+                  <button
+                    key={category.slug}
+                    onClick={() => setActiveCategory(category.slug)}
+                    className={`relative min-w-[104px] h-20 rounded-[22px] border transition-all duration-300 flex flex-col items-center justify-center gap-1 ${
+                      active
+                        ? "bg-white/[0.08] border-white/15 text-amber-400 shadow-[0_0_45px_rgba(245,158,11,.12)]"
+                        : "bg-transparent border-transparent text-zinc-500 hover:text-white hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    {active && (
+                      <span className="absolute -top-px left-1/2 -translate-x-1/2 w-8 h-[2px] bg-amber-400 rounded-full" />
+                    )}
+
+                    <span className="text-xl leading-none">{category.icon}</span>
+
+                    <span className="text-xs md:text-sm font-medium">
+                      {category.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {cart.length > 0 && (
+              <button
+                onClick={() => setCartOpen(true)}
+                className="ml-auto hidden lg:flex items-center gap-4 rounded-full border border-amber-400/40 px-6 py-3 text-sm shrink-0 hover:bg-amber-400 hover:text-black transition"
+              >
+                <span className="relative text-xl">
+                  🛒
+                  <span className="absolute -top-3 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                    {totalItems}
+                  </span>
+                </span>
+
+                <span className="font-semibold">R$ {total.toFixed(2)}</span>
+              </button>
+            )}
           </div>
         </div>
       </nav>
 
-      <section id="menu" className="max-w-7xl mx-auto px-5 py-8">
-        <div className="grid lg:grid-cols-[1fr_380px] gap-8 items-start">
+
+      <section id="menu" className="max-w-7xl mx-auto px-5 py-12">
+        <div className="grid lg:grid-cols-[1fr_440px] gap-10 items-start">
           <div>
-            <p className="text-amber-400 uppercase tracking-[0.3em] text-xs">
+            <p className="text-amber-400 uppercase tracking-[0.3em] text-sm">
               {activeCategory === "todos"
-                ? "Cardápio"
+                ? "Burgers"
                 : categories.find((c) => c.slug === activeCategory)?.name}
             </p>
 
-            <h2 className="text-3xl md:text-4xl font-semibold mt-2">
-              Escolha seu pedido
+            <h2 className="text-4xl font-semibold mt-2">
+              Feitos para quem leva o sabor a sério.
             </h2>
 
-            <div className="mt-7 grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="mt-8 space-y-4">
               {filteredProducts.map((product) => (
                 <article
-  key={product.id}
-  className="group bg-[#141414] border border-white/10 rounded-[24px] overflow-hidden hover:border-amber-400/40 hover:bg-[#181818] transition shadow-[0_20px_60px_rgba(0,0,0,.25)]"
->
-  <div className="aspect-square bg-[#1d1d1d] flex items-center justify-center overflow-hidden">
-    {product.image_url ? (
-      <img
-        src={product.image_url}
-        alt={product.name}
-        className="w-full h-full object-contain p-4 group-hover:scale-105 transition duration-300"
-      />
-    ) : (
-      <div className="text-6xl">🍔</div>
-    )}
-  </div>
+                  key={product.id}
+                  className="bg-[#111] border border-white/10 rounded-[24px] overflow-hidden hover:border-amber-400/40 transition min-h-[160px]"
+                >
+                  <div className="grid sm:grid-cols-[180px_1fr_80px]">
+                    <div className="h-44 sm:h-40 bg-zinc-950/70 border-r border-white/10 flex items-center justify-center p-4">
+  {product.image_url ? (
+    <img
+      src={product.image_url}
+      alt={product.name}
+      className="max-w-full max-h-full object-contain drop-shadow-2xl"
+    />
+  ) : (
+    <div className="w-full h-full flex items-center justify-center text-6xl">
+      🍔
+    </div>
+  )}
+</div>
 
-  <div className="p-4">
-    <p className="text-amber-400 text-lg font-bold">
-      R$ {Number(product.price).toFixed(2)}
-    </p>
+                    <div className="p-6">
+                      <h3 className="text-2xl font-semibold">
+                        {product.name}
+                      </h3>
 
-    <h3 className="mt-2 text-white text-base md:text-lg font-semibold leading-tight line-clamp-2">
-      {product.name}
-    </h3>
+                      <p className="text-zinc-400 mt-3 leading-relaxed">
+                        {product.description}
+                      </p>
 
-    <p className="mt-2 text-sm text-zinc-400 line-clamp-2 min-h-10">
-      {product.description}
-    </p>
+                      <p className="text-amber-400 text-2xl font-semibold mt-5">
+                        R$ {Number(product.price).toFixed(2)}
+                      </p>
+                    </div>
 
-    <button
-      onClick={() => addToCart(product)}
-      className="mt-4 w-full bg-amber-400 text-black py-3 rounded-2xl font-semibold hover:bg-amber-300 transition"
-    >
-      Adicionar
-    </button>
-  </div>
-</article>
+                    <div className="p-6 flex items-end">
+                      <button
+                        onClick={() => addToCart(product)}
+                        className="w-full sm:w-14 h-14 rounded-full border border-amber-400 text-amber-400 text-3xl hover:bg-amber-400 hover:text-black transition"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </article>
               ))}
             </div>
           </div>
 
-          <aside className="hidden lg:block sticky top-28 bg-[#141414] text-white border border-white/10 rounded-[28px] p-5 shadow-[0_20px_60px_rgba(0,0,0,.35)]">
+          <aside className="hidden lg:block sticky top-32 bg-[#111] border border-white/10 rounded-[32px] p-6">
             <CartContent
               cart={cart}
               total={total}
@@ -483,9 +521,9 @@ export default function MenuPage() {
       {cart.length > 0 && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed bottom-5 left-5 right-5 md:left-1/2 md:-translate-x-1/2 md:w-[520px] z-40 bg-neutral-950 border border-white/15 rounded-full px-5 py-4 flex items-center justify-between shadow-2xl"
+          className="fixed bottom-5 left-5 right-5 md:left-1/2 md:-translate-x-1/2 md:w-[520px] z-40 bg-black/90 backdrop-blur-xl border border-white/15 rounded-[28px] px-6 py-4 flex items-center justify-between shadow-2xl"
         >
-          <span className="flex items-center gap-3">
+          <span className="flex items-center gap-4">
             <span className="relative text-2xl">
               🛒
               <span className="absolute -top-2 -right-3 bg-amber-400 text-black text-xs w-5 h-5 rounded-full flex items-center justify-center">
@@ -493,22 +531,22 @@ export default function MenuPage() {
               </span>
             </span>
 
-            <strong>{totalItems} item(ns)</strong>
+            <strong>R$ {total.toFixed(2)}</strong>
           </span>
 
-          <strong className="text-amber-400">R$ {total.toFixed(2)}</strong>
+          <span>Ver pedido ↑</span>
         </button>
       )}
 
       {cartOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
-          <aside className="w-full max-w-lg bg-white text-black h-full p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end lg:hidden">
+          <aside className="w-full max-w-lg bg-[#111] h-full p-6 overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-semibold">Meu pedido</h3>
 
               <button
                 onClick={() => setCartOpen(false)}
-                className="w-10 h-10 rounded-full bg-zinc-100 text-2xl"
+                className="text-2xl"
               >
                 ×
               </button>
@@ -528,13 +566,13 @@ export default function MenuPage() {
 
       {checkoutOpen && (
         <div className="fixed inset-0 z-[60] bg-black/80 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white text-black rounded-[32px] w-full max-w-md p-6">
+          <div className="bg-[#111] border border-white/10 rounded-[32px] w-full max-w-md p-6">
             <div className="flex justify-between">
               <h3 className="text-2xl font-semibold">Finalizar pedido</h3>
 
               <button
                 onClick={() => setCheckoutOpen(false)}
-                className="w-10 h-10 rounded-full bg-zinc-100 text-2xl"
+                className="text-2xl"
               >
                 ×
               </button>
@@ -547,7 +585,7 @@ export default function MenuPage() {
                   setCustomer({ ...customer, name: e.target.value })
                 }
                 placeholder="Seu nome"
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none"
+                className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
               />
 
               <input
@@ -556,21 +594,21 @@ export default function MenuPage() {
                   setCustomer({ ...customer, phone: e.target.value })
                 }
                 placeholder="Telefone"
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none"
+                className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
               />
 
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Observações"
-                className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl px-4 py-4 outline-none min-h-24"
+                className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none min-h-24"
               />
             </div>
 
             <button
               onClick={submitOrder}
               disabled={loading}
-              className="mt-6 w-full bg-neutral-950 text-white py-4 rounded-full font-semibold disabled:opacity-50"
+              className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold disabled:opacity-50"
             >
               {loading
                 ? "Enviando..."
@@ -580,37 +618,37 @@ export default function MenuPage() {
         </div>
       )}
 
-      {myOrdersOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
-          <aside className="w-full max-w-lg bg-white text-black h-full p-6 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <p className="text-zinc-500 text-sm">{customer.name}</p>
-                <h3 className="text-2xl font-semibold">Meus pedidos</h3>
-              </div>
+  {myOrdersOpen && (
+  <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
+    <aside className="w-full max-w-lg bg-[#111] h-full p-6 overflow-y-auto">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <p className="text-zinc-500 text-sm">{customer.name}</p>
+          <h3 className="text-2xl font-semibold">Meus pedidos</h3>
+        </div>
 
-              <button
-                onClick={() => setMyOrdersOpen(false)}
-                className="w-10 h-10 rounded-full bg-zinc-100 text-2xl"
-              >
-                ×
-              </button>
-            </div>
+        <button
+          onClick={() => setMyOrdersOpen(false)}
+          className="text-2xl"
+        >
+          ×
+        </button>
+      </div>
 
-            {myOrders.length === 0 ? (
-              <div className="border border-zinc-200 rounded-3xl p-6 text-center">
-                <p className="text-4xl">🧾</p>
-                <p className="text-zinc-500 mt-3">Nenhum pedido encontrado.</p>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                <OrderGroup title="Em andamento" orders={activeMyOrders} />
-                <OrderGroup title="Finalizados" orders={finishedMyOrders} />
-              </div>
-            )}
-          </aside>
+      {myOrders.length === 0 ? (
+        <div className="border border-white/10 rounded-3xl p-6 text-center">
+          <p className="text-4xl">🧾</p>
+          <p className="text-zinc-400 mt-3">Nenhum pedido encontrado.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          <OrderGroup title="Em andamento" orders={activeMyOrders} />
+          <OrderGroup title="Finalizados" orders={finishedMyOrders} />
         </div>
       )}
+    </aside>
+  </div>
+)}
     </main>
   );
 }
@@ -634,13 +672,16 @@ function CartContent({
       ) : (
         <div className="mt-6 space-y-5">
           {cart.map((item) => (
-            <div key={item.id} className="flex gap-4 border-b border-white/10 pb-5">
-              <div className="w-20 h-20 rounded-2xl bg-[#1d1d1d] overflow-hidden shrink-0">
+            <div
+              key={item.id}
+              className="flex gap-4 border-b border-white/10 pb-5"
+            >
+              <div className="w-20 h-20 rounded-2xl bg-zinc-900 overflow-hidden">
                 {item.image_url ? (
                   <img
                     src={item.image_url}
                     alt={item.name}
-                    className="w-full h-full object-contain p-2"
+                    className="w-full h-full object-cover"
                   />
                 ) : (
                   <div className="h-full flex items-center justify-center text-3xl">
@@ -650,12 +691,12 @@ function CartContent({
               </div>
 
               <div className="flex-1">
-                <div className="flex justify-between gap-3">
+                <div className="flex justify-between">
                   <p className="font-semibold">{item.name}</p>
 
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="text-zinc-400"
+                    className="text-zinc-500"
                   >
                     🗑️
                   </button>
@@ -666,10 +707,10 @@ function CartContent({
                 </p>
 
                 <div className="mt-3 flex justify-between items-center">
-                  <div className="flex border border-zinc-200 rounded-xl overflow-hidden">
+                  <div className="flex border border-white/10 rounded-xl overflow-hidden">
                     <button
                       onClick={() => decreaseItem(item.id)}
-                      className="w-8 h-8 bg-zinc-50"
+                      className="w-8 h-8 bg-white/5"
                     >
                       -
                     </button>
@@ -680,7 +721,7 @@ function CartContent({
 
                     <button
                       onClick={() => increaseItem(item.id)}
-                      className="w-8 h-8 bg-zinc-50"
+                      className="w-8 h-8 bg-white/5"
                     >
                       +
                     </button>
@@ -695,7 +736,7 @@ function CartContent({
           ))}
 
           <div className="pt-4">
-            <div className="flex justify-between text-zinc-500">
+            <div className="flex justify-between text-zinc-400">
               <span>Subtotal</span>
               <span>R$ {total.toFixed(2)}</span>
             </div>
@@ -709,10 +750,14 @@ function CartContent({
 
             <button
               onClick={onCheckout}
-              className="mt-6 w-full bg-neutral-950 text-white py-4 rounded-full font-semibold"
+              className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
             >
               Finalizar pedido
             </button>
+
+            <p className="text-center text-zinc-500 text-sm mt-4">
+              Pedido seguro e protegido
+            </p>
           </div>
         </div>
       )}
@@ -724,11 +769,11 @@ function OrderGroup({ title, orders }) {
   if (!orders.length) {
     return (
       <section>
-        <h4 className="text-sm uppercase tracking-[0.25em] text-zinc-400 mb-3">
+        <h4 className="text-sm uppercase tracking-[0.25em] text-amber-400 mb-3">
           {title}
         </h4>
 
-        <div className="border border-zinc-200 rounded-3xl p-5 text-zinc-500 text-sm">
+        <div className="border border-white/10 rounded-3xl p-5 text-zinc-500 text-sm">
           Nenhum pedido aqui.
         </div>
       </section>
@@ -737,7 +782,7 @@ function OrderGroup({ title, orders }) {
 
   return (
     <section>
-      <h4 className="text-sm uppercase tracking-[0.25em] text-zinc-400 mb-3">
+      <h4 className="text-sm uppercase tracking-[0.25em] text-amber-400 mb-3">
         {title}
       </h4>
 
@@ -745,7 +790,7 @@ function OrderGroup({ title, orders }) {
         {orders.map((order) => (
           <div
             key={order.id}
-            className="border border-zinc-200 rounded-3xl p-5 bg-white"
+            className="border border-white/10 rounded-3xl p-5 bg-black/20"
           >
             <div className="flex justify-between gap-3">
               <div>
@@ -767,7 +812,7 @@ function OrderGroup({ title, orders }) {
               {order.order_items?.map((item) => (
                 <div
                   key={item.id}
-                  className="flex justify-between text-sm text-zinc-600 gap-3"
+                  className="flex justify-between text-sm text-zinc-300 gap-3"
                 >
                   <span>
                     {item.quantity}x {item.product_name}
@@ -794,11 +839,11 @@ function StatusPill({ status }) {
   };
 
   const styles = {
-    recebido: "bg-red-50 text-red-600 border-red-100",
-    preparando: "bg-blue-50 text-blue-600 border-blue-100",
-    pronto: "bg-emerald-50 text-emerald-600 border-emerald-100",
-    entregue: "bg-green-50 text-green-600 border-green-100",
-    cancelado: "bg-zinc-100 text-zinc-600 border-zinc-200",
+    recebido: "bg-red-500/15 text-red-300 border-red-500/20",
+    preparando: "bg-blue-500/15 text-blue-300 border-blue-500/20",
+    pronto: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
+    entregue: "bg-green-500/15 text-green-300 border-green-500/20",
+    cancelado: "bg-zinc-500/15 text-zinc-300 border-zinc-500/20",
   };
 
   return (
