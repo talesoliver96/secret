@@ -69,9 +69,59 @@ exports.getOrders = async (req, res) => {
 exports.getHistory = async (req, res) => {
   const { page, limit, from, to } = getPagination(req);
 
-  const { data, error, count } = await supabase
+  const {
+    search,
+    status,
+    payment_status,
+    table_number,
+    date_from,
+    date_to,
+    min_total,
+    max_total,
+  } = req.query;
+
+  let customerIds = [];
+  let productOrderIds = [];
+
+  if (search) {
+    const term = search.trim();
+
+    const { data: matchedCustomers, error: customerError } = await supabase
+      .from("customers")
+      .select("id")
+      .or(`name.ilike.%${term}%,phone.ilike.%${term}%`);
+
+    if (customerError) {
+      return res.status(500).json({ error: customerError.message });
+    }
+
+    customerIds = (matchedCustomers || []).map((customer) => customer.id);
+
+    const { data: matchedItems, error: itemsError } = await supabase
+      .from("order_items")
+      .select("order_id")
+      .ilike("product_name", `%${term}%`);
+
+    if (itemsError) {
+      return res.status(500).json({ error: itemsError.message });
+    }
+
+    productOrderIds = [
+      ...new Set((matchedItems || []).map((item) => item.order_id)),
+    ];
+
+    if (customerIds.length === 0 && productOrderIds.length === 0) {
+      return res.json({
+        data: [],
+        pagination: buildPagination(page, limit, 0),
+      });
+    }
+  }
+
+  let query = supabase
     .from("orders")
-    .select(`
+    .select(
+      `
       *,
       customers (
         id,
@@ -86,15 +136,62 @@ exports.getHistory = async (req, res) => {
         subtotal,
         notes
       )
-    `, { count: "exact" })
+    `,
+      { count: "exact" }
+    )
     .not("status", "in", `(${ACTIVE_STATUSES.join(",")})`)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+    .order("created_at", { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (search) {
+    const orFilters = [];
+
+    if (customerIds.length > 0) {
+      orFilters.push(`customer_id.in.(${customerIds.join(",")})`);
+    }
+
+    if (productOrderIds.length > 0) {
+      orFilters.push(`id.in.(${productOrderIds.join(",")})`);
+    }
+
+    query = query.or(orFilters.join(","));
+  }
+
+  if (status && status !== "todos") {
+    query = query.eq("status", status);
+  }
+
+  if (payment_status && payment_status !== "todos") {
+    query = query.eq("payment_status", payment_status);
+  }
+
+  if (table_number) {
+    query = query.eq("table_number", Number(table_number));
+  }
+
+  if (date_from) {
+    query = query.gte("created_at", `${date_from}T00:00:00`);
+  }
+
+  if (date_to) {
+    query = query.lte("created_at", `${date_to}T23:59:59`);
+  }
+
+  if (min_total) {
+    query = query.gte("total", Number(min_total));
+  }
+
+  if (max_total) {
+    query = query.lte("total", Number(max_total));
+  }
+
+  const { data, error, count } = await query.range(from, to);
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
 
   res.json({
-    data,
+    data: data || [],
     pagination: buildPagination(page, limit, count),
   });
 };

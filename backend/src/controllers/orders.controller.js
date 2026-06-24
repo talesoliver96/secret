@@ -142,3 +142,41 @@ if (tableError || !table) {
     });
   }
 };
+
+exports.getCustomerOrdersByPhone = async (req, res) => {
+  const { phone } = req.query;
+
+  if (!phone) {
+    return res.status(400).json({ error: "Telefone é obrigatório." });
+  }
+
+  const { data: customer, error: customerError } = await supabase
+    .from("customers")
+    .select("id, name, phone")
+    .eq("phone", phone)
+    .single();
+
+  if (customerError || !customer) {
+    return res.json([]);
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      order_items (
+        id,
+        product_name,
+        quantity,
+        unit_price,
+        subtotal
+      )
+    `)
+    .eq("customer_id", customer.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  res.json(data || []);
+};

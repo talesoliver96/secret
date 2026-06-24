@@ -3,6 +3,40 @@ import { useParams } from "react-router-dom";
 import api from "../../api/axios";
 import logo from "../../assets/logo.png";
 import heroBurger from "../../assets/hero-burger.png";
+import { formatDateTime } from "../../utils/date";
+
+const CUSTOMER_CACHE_KEY = "@secretburger:customer";
+const CUSTOMER_CACHE_TTL = 3 * 60 * 60 * 1000;
+
+function getCachedCustomer() {
+  const raw = localStorage.getItem(CUSTOMER_CACHE_KEY);
+
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+
+    if (Date.now() - parsed.savedAt > CUSTOMER_CACHE_TTL) {
+      localStorage.removeItem(CUSTOMER_CACHE_KEY);
+      return null;
+    }
+
+    return parsed.customer;
+  } catch {
+    localStorage.removeItem(CUSTOMER_CACHE_KEY);
+    return null;
+  }
+}
+
+function saveCachedCustomer(customer) {
+  localStorage.setItem(
+    CUSTOMER_CACHE_KEY,
+    JSON.stringify({
+      customer,
+      savedAt: Date.now(),
+    })
+  );
+}
 
 export default function MenuPage() {
   const { numero, token } = useParams();
@@ -19,9 +53,34 @@ export default function MenuPage() {
   const [loading, setLoading] = useState(false);
   const [successOrder, setSuccessOrder] = useState(null);
 
+  const [customerReady, setCustomerReady] = useState(false);
+  const [myOrdersOpen, setMyOrdersOpen] = useState(false);
+  const [myOrders, setMyOrders] = useState([]);
+
   async function loadMenu() {
     const { data } = await api.get("/menu");
     setProducts(data || []);
+  }
+
+  async function loadMyOrders() {
+    try {
+      if (!customer.phone) {
+        alert("Telefone não encontrado");
+        return;
+      }
+
+      const { data } = await api.get(
+        `/public/my-orders?phone=${encodeURIComponent(customer.phone)}`
+      );
+
+      console.log(data);
+
+      setMyOrders(data || []);
+      setMyOrdersOpen(true);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao carregar pedidos");
+    }
   }
 
   useEffect(() => {
@@ -29,6 +88,14 @@ export default function MenuPage() {
       try {
         await api.get(`/public/table/${numero}/${token}`);
         setTableValid(true);
+
+        const cached = getCachedCustomer();
+
+        if (cached?.name && cached?.phone) {
+          setCustomer(cached);
+          setCustomerReady(true);
+        }
+
         loadMenu();
       } catch (error) {
         setTableError(
@@ -145,6 +212,8 @@ export default function MenuPage() {
     try {
       setLoading(true);
 
+      saveCachedCustomer(customer);
+
       const { data } = await api.post("/orders", {
         table_number: Number(numero),
         table_token: token,
@@ -217,6 +286,63 @@ export default function MenuPage() {
     );
   }
 
+  if (!customerReady) {
+  return (
+    <main className="min-h-screen bg-black text-white flex items-center justify-center px-5">
+      <section className="w-full max-w-md bg-[#111] border border-white/10 rounded-[32px] p-6">
+        <h1 className="text-3xl font-semibold">Antes de pedir</h1>
+
+        <p className="text-zinc-400 mt-3">
+          Informe seu nome e telefone para acompanhar seus pedidos nesta mesa.
+        </p>
+
+        <div className="mt-6 space-y-3">
+          <input
+            value={customer.name}
+            onChange={(e) =>
+              setCustomer({ ...customer, name: e.target.value })
+            }
+            placeholder="Seu nome"
+            className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
+          />
+
+          <input
+            value={customer.phone}
+            onChange={(e) =>
+              setCustomer({ ...customer, phone: e.target.value })
+            }
+            placeholder="Telefone"
+            className="w-full bg-black border border-white/10 rounded-2xl px-4 py-4 outline-none"
+          />
+        </div>
+
+        <button
+          onClick={() => {
+            if (!customer.name.trim() || !customer.phone.trim()) {
+              alert("Informe nome e telefone.");
+              return;
+            }
+
+            saveCachedCustomer(customer);
+            setCustomerReady(true);
+          }}
+          className="mt-6 w-full bg-amber-400 text-black py-4 rounded-full font-semibold"
+        >
+          Entrar no cardápio
+        </button>
+      </section>
+    </main>
+  );
+}
+
+const activeMyOrders = myOrders.filter((order) =>
+  ["recebido", "preparando", "pronto"].includes(order.status)
+);
+
+const finishedMyOrders = myOrders.filter((order) =>
+  ["entregue", "cancelado"].includes(order.status)
+);
+
   return (
     <main className="min-h-screen bg-black text-white pb-28">
       <section className="relative min-h-[560px] overflow-hidden border-b border-white/10">
@@ -263,6 +389,12 @@ export default function MenuPage() {
               <p className="text-sm font-semibold text-white">THE SECRET</p>
               <p className="text-sm font-semibold text-amber-400">BURGER.</p>
             </div>
+                                        <button
+  onClick={loadMyOrders}
+  className="border border-white/15 rounded-full px-5 py-3 text-sm bg-black/30 backdrop-blur-xl"
+>
+  Meus pedidos
+</button>
 
             <div className="flex items-center gap-3">
               {categories.map((category) => {
@@ -310,6 +442,7 @@ export default function MenuPage() {
           </div>
         </div>
       </nav>
+
 
       <section id="menu" className="max-w-7xl mx-auto px-5 py-12">
         <div className="grid lg:grid-cols-[1fr_440px] gap-10 items-start">
@@ -485,6 +618,38 @@ export default function MenuPage() {
           </div>
         </div>
       )}
+
+  {myOrdersOpen && (
+  <div className="fixed inset-0 z-50 bg-black/70 flex justify-end">
+    <aside className="w-full max-w-lg bg-[#111] h-full p-6 overflow-y-auto">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <p className="text-zinc-500 text-sm">{customer.name}</p>
+          <h3 className="text-2xl font-semibold">Meus pedidos</h3>
+        </div>
+
+        <button
+          onClick={() => setMyOrdersOpen(false)}
+          className="text-2xl"
+        >
+          ×
+        </button>
+      </div>
+
+      {myOrders.length === 0 ? (
+        <div className="border border-white/10 rounded-3xl p-6 text-center">
+          <p className="text-4xl">🧾</p>
+          <p className="text-zinc-400 mt-3">Nenhum pedido encontrado.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          <OrderGroup title="Em andamento" orders={activeMyOrders} />
+          <OrderGroup title="Finalizados" orders={finishedMyOrders} />
+        </div>
+      )}
+    </aside>
+  </div>
+)}
     </main>
   );
 }
@@ -598,5 +763,97 @@ function CartContent({
         </div>
       )}
     </>
+  );
+}
+
+function OrderGroup({ title, orders }) {
+  if (!orders.length) {
+    return (
+      <section>
+        <h4 className="text-sm uppercase tracking-[0.25em] text-amber-400 mb-3">
+          {title}
+        </h4>
+
+        <div className="border border-white/10 rounded-3xl p-5 text-zinc-500 text-sm">
+          Nenhum pedido aqui.
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <h4 className="text-sm uppercase tracking-[0.25em] text-amber-400 mb-3">
+        {title}
+      </h4>
+
+      <div className="space-y-4">
+        {orders.map((order) => (
+          <div
+            key={order.id}
+            className="border border-white/10 rounded-3xl p-5 bg-black/20"
+          >
+            <div className="flex justify-between gap-3">
+              <div>
+                <p className="font-semibold">Mesa {order.table_number}</p>
+
+                <p className="text-xs text-zinc-500 mt-1">
+                  {formatDateTime(order.created_at)}
+                </p>
+
+                <StatusPill status={order.status} />
+              </div>
+
+              <p className="text-amber-400 font-semibold">
+                R$ {Number(order.total).toFixed(2)}
+              </p>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              {order.order_items?.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex justify-between text-sm text-zinc-300 gap-3"
+                >
+                  <span>
+                    {item.quantity}x {item.product_name}
+                  </span>
+
+                  <span>R$ {Number(item.subtotal).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StatusPill({ status }) {
+  const labels = {
+    recebido: "Recebido",
+    preparando: "Preparando",
+    pronto: "Pronto para entrega",
+    entregue: "Entregue",
+    cancelado: "Cancelado",
+  };
+
+  const styles = {
+    recebido: "bg-red-500/15 text-red-300 border-red-500/20",
+    preparando: "bg-blue-500/15 text-blue-300 border-blue-500/20",
+    pronto: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
+    entregue: "bg-green-500/15 text-green-300 border-green-500/20",
+    cancelado: "bg-zinc-500/15 text-zinc-300 border-zinc-500/20",
+  };
+
+  return (
+    <span
+      className={`inline-flex mt-3 px-3 py-1 rounded-full text-xs border ${
+        styles[status] || styles.recebido
+      }`}
+    >
+      {labels[status] || status}
+    </span>
   );
 }

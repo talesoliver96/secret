@@ -4,6 +4,17 @@ import api from "../../api/axios";
 import PremiumPagination from "../../components/PremiumPagination";
 import { formatDateTime } from "../../utils/date";
 
+const defaultFilters = {
+  search: "",
+  status: "todos",
+  payment_status: "todos",
+  table_number: "",
+  date_from: "",
+  date_to: "",
+  min_total: "",
+  max_total: "",
+};
+
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -11,18 +22,19 @@ function money(value) {
   });
 }
 
-function dateTime(date) {
-  if (!date) return "-";
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
 
-  return new Date(date).toLocaleString("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
+function daysAgo(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
 }
 
 export default function HistoryPage() {
   const [orders, setOrders] = useState([]);
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState(defaultFilters);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
@@ -30,13 +42,34 @@ export default function HistoryPage() {
   const itemsPerPage = 12;
 
   async function loadHistory(nextPage = page) {
-    const { data } = await api.get(
-      `/admin/orders/history?page=${nextPage}&limit=${itemsPerPage}`
-    );
+    const params = new URLSearchParams({
+      page: String(nextPage),
+      limit: String(itemsPerPage),
+    });
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value && value !== "todos") {
+        params.append(key, value);
+      }
+    });
+
+    const { data } = await api.get(`/admin/orders/history?${params.toString()}`);
 
     setOrders(data.data || []);
     setPagination(data.pagination);
   }
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      loadHistory(page);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [page, filters]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   async function cancelOrder(order) {
     const reason = window.prompt(
@@ -52,27 +85,42 @@ export default function HistoryPage() {
     await loadHistory(page);
   }
 
-  useEffect(() => {
-    loadHistory(page);
-  }, [page]);
+  function updateFilter(name, value) {
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
 
-  const filteredOrders = useMemo(() => {
-    const term = search.toLowerCase();
+  function setPeriod(type) {
+    if (type === "today") {
+      setFilters((prev) => ({
+        ...prev,
+        date_from: today(),
+        date_to: today(),
+      }));
+    }
 
-    return orders.filter((order) => {
-      return (
-        !term ||
-        String(order.table_number).includes(term) ||
-        order.status?.toLowerCase().includes(term) ||
-        order.payment_status?.toLowerCase().includes(term) ||
-        order.customers?.name?.toLowerCase().includes(term) ||
-        order.customers?.phone?.toLowerCase().includes(term) ||
-        order.order_items?.some((item) =>
-          item.product_name?.toLowerCase().includes(term)
-        )
-      );
-    });
-  }, [orders, search]);
+    if (type === "7days") {
+      setFilters((prev) => ({
+        ...prev,
+        date_from: daysAgo(7),
+        date_to: today(),
+      }));
+    }
+
+    if (type === "30days") {
+      setFilters((prev) => ({
+        ...prev,
+        date_from: daysAgo(30),
+        date_to: today(),
+      }));
+    }
+
+    if (type === "clear") {
+      setFilters(defaultFilters);
+    }
+  }
 
   const totals = useMemo(() => {
     const paidOrders = orders.filter((order) => order.payment_status === "pago");
@@ -94,7 +142,7 @@ export default function HistoryPage() {
   return (
     <AdminLayout
       title="Histórico"
-      subtitle="Pedidos entregues, pagos ou cancelados. Use esta área para auditoria e conferência."
+      subtitle="Audite pedidos por período, mesa, cliente, produto, status e pagamento."
     >
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <Metric title="Registros" value={totals.total} />
@@ -104,32 +152,124 @@ export default function HistoryPage() {
       </div>
 
       <section className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-          <div>
-            <h3 className="text-xl font-semibold">Histórico de pedidos</h3>
-            <p className="text-sm text-slate-500">
-              {pagination?.total || filteredOrders.length} pedido(s) encontrado(s)
-            </p>
+        <div className="p-5 border-b border-slate-100">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-semibold">Filtros avançados</h3>
+              <p className="text-sm text-slate-500">
+                Refine a busca por pedido, cliente, mesa, período ou pagamento.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setPeriod("clear")}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-2xl font-medium"
+            >
+              Limpar filtros
+            </button>
+          </div>
+
+          <div className="mt-5 flex gap-2 overflow-x-auto">
+            <button
+              onClick={() => setPeriod("today")}
+              className="px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-medium hover:bg-slate-50"
+            >
+              Hoje
+            </button>
+
+            <button
+              onClick={() => setPeriod("7days")}
+              className="px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-medium hover:bg-slate-50"
+            >
+              Últimos 7 dias
+            </button>
+
+            <button
+              onClick={() => setPeriod("30days")}
+              className="px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-medium hover:bg-slate-50"
+            >
+              Últimos 30 dias
+            </button>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <input
+              value={filters.search}
+              onChange={(e) => updateFilter("search", e.target.value)}
+              placeholder="Cliente, telefone ou produto..."
+              className="admin-input"
+            />
+
+            <input
+              value={filters.table_number}
+              onChange={(e) => updateFilter("table_number", e.target.value)}
+              placeholder="Mesa"
+              type="number"
+              className="admin-input"
+            />
+
+            <select
+              value={filters.status}
+              onChange={(e) => updateFilter("status", e.target.value)}
+              className="admin-input"
+            >
+              <option value="todos">Todos status</option>
+              <option value="entregue">Entregue</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+
+            <select
+              value={filters.payment_status}
+              onChange={(e) => updateFilter("payment_status", e.target.value)}
+              className="admin-input"
+            >
+              <option value="todos">Todos pagamentos</option>
+              <option value="pendente">Pendente</option>
+              <option value="fechado">Fechado</option>
+              <option value="pago">Pago</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+
+            <input
+              value={filters.date_from}
+              onChange={(e) => updateFilter("date_from", e.target.value)}
+              type="date"
+              className="admin-input"
+            />
+
+            <input
+              value={filters.date_to}
+              onChange={(e) => updateFilter("date_to", e.target.value)}
+              type="date"
+              className="admin-input"
+            />
+
+            <input
+              value={filters.min_total}
+              onChange={(e) => updateFilter("min_total", e.target.value)}
+              placeholder="Valor mínimo"
+              type="number"
+              className="admin-input"
+            />
+
+            <input
+              value={filters.max_total}
+              onChange={(e) => updateFilter("max_total", e.target.value)}
+              placeholder="Valor máximo"
+              type="number"
+              className="admin-input"
+            />
           </div>
         </div>
 
-        <div className="p-5 border-b border-slate-100 bg-slate-50/60">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por mesa, cliente, telefone, produto ou status..."
-            className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-          />
-        </div>
-
-        {filteredOrders.length === 0 ? (
+        {orders.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-5xl">🕒</p>
             <h3 className="text-xl font-semibold mt-4">
               Nenhum pedido encontrado
             </h3>
             <p className="text-slate-500 mt-2">
-              Pedidos finalizados aparecerão aqui.
+              Ajuste os filtros ou limpe a busca.
             </p>
           </div>
         ) : (
@@ -162,7 +302,7 @@ export default function HistoryPage() {
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {filteredOrders.map((order) => (
+                {orders.map((order) => (
                   <tr key={order.id} className="hover:bg-slate-50/70 transition">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-4">
@@ -249,7 +389,7 @@ export default function HistoryPage() {
             </table>
 
             <PremiumPagination
-              totalItems={pagination?.total || filteredOrders.length}
+              totalItems={pagination?.total || orders.length}
               itemsPerPage={itemsPerPage}
               currentPage={page}
               onPageChange={setPage}
